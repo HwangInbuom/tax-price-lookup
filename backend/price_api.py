@@ -76,8 +76,13 @@ def fetch_apartment_price_raw(
     if ho_nm:
         params["hoNm"] = ho_nm
 
-    res = requests.get(BASE_URL, params=params, timeout=5)
-    res.raise_for_status()
+    try:
+        res = requests.get(BASE_URL, params=params, timeout=8)
+        res.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        # 브이월드 서버가 응답 없이 연결을 끊는 경우 등, 네트워크 단계 실패를 포함한다.
+        # (예: 해외 서버에서 호출 시 국내 공공기관 API가 접속 자체를 막는 경우가 있음)
+        raise PriceLookupError(f"브이월드 서버 연결 실패: {e}")
     return res.json()
 
 

@@ -28,9 +28,12 @@ def search_address(query: str, kakao_rest_api_key: str) -> dict:
     """
     headers = {"Authorization": f"KakaoAK {kakao_rest_api_key}"}
     params = {"query": query, "analyze_type": "similar", "size": 1}
-    res = requests.get(KAKAO_ADDRESS_SEARCH_URL, headers=headers, params=params, timeout=5)
-    res.raise_for_status()
-    data = res.json()
+    try:
+        res = requests.get(KAKAO_ADDRESS_SEARCH_URL, headers=headers, params=params, timeout=8)
+        res.raise_for_status()
+        data = res.json()
+    except requests.exceptions.RequestException as e:
+        raise AddressNotFoundError(f"카카오 주소 검색 서버 연결 실패: {e}")
 
     documents = data.get("documents", [])
     if not documents:

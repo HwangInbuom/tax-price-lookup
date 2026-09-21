@@ -46,11 +46,26 @@ dongNm/hoNm을 지정하지 않으면 여러 세대가 섞여서 돌아오므로
 
 import requests
 
-BASE_URL = "http://api.vworld.kr/ned/data/getApartHousingPriceAttr"
+BASE_URL = "https://api.vworld.kr/ned/data/getApartHousingPriceAttr"
 
 
 class PriceLookupError(Exception):
     pass
+
+
+def _referer_header(vworld_domain: str) -> str | None:
+    """브이월드는 domain 쿼리 파라미터뿐 아니라, 실제 HTTP Referer 헤더까지
+    등록된 도메인과 일치하는지 함께 검사하는 것으로 확인되었다 (2026-09-21).
+    서버 대 서버(백엔드) 호출은 브라우저가 아니라서 Referer 헤더가 원래 비어
+    있는데, 이게 브이월드 쪽에서 비정상 요청으로 간주되어 연결 자체를 끊어버리는
+    것으로 보인다. domain 파라미터로 등록한 도메인을 그대로 Referer로도 실어
+    보낸다."""
+    domain = (vworld_domain or "").strip()
+    if not domain:
+        return None
+    if domain.startswith("http://") or domain.startswith("https://"):
+        return domain if domain.endswith("/") else domain + "/"
+    return f"https://{domain}/"
 
 
 def fetch_apartment_price_raw(
@@ -76,8 +91,13 @@ def fetch_apartment_price_raw(
     if ho_nm:
         params["hoNm"] = ho_nm
 
+    headers = {}
+    referer = _referer_header(vworld_domain)
+    if referer:
+        headers["Referer"] = referer
+
     try:
-        res = requests.get(BASE_URL, params=params, timeout=8)
+        res = requests.get(BASE_URL, params=params, headers=headers, timeout=8)
         res.raise_for_status()
     except requests.exceptions.RequestException as e:
         # 브이월드 서버가 응답 없이 연결을 끊는 경우 등, 네트워크 단계 실패를 포함한다.

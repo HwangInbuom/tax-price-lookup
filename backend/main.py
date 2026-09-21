@@ -18,9 +18,16 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from pnu import address_to_pnu, AddressNotFoundError
-from price_api import get_apartment_price, PriceLookupError
-from trade_price_api import get_recent_trades, get_trades_for_month, TradePriceLookupError
+try:
+    # Render 등: backend/ 폴더 안에서 직접 실행되는 경우 (평범한 파일 import)
+    from pnu import address_to_pnu, AddressNotFoundError
+    from price_api import get_apartment_price, PriceLookupError
+    from trade_price_api import get_recent_trades, get_trades_for_month, TradePriceLookupError
+except ImportError:
+    # Vercel 등: backend가 패키지(backend.main)로 import되는 경우
+    from backend.pnu import address_to_pnu, AddressNotFoundError
+    from backend.price_api import get_apartment_price, PriceLookupError
+    from backend.trade_price_api import get_recent_trades, get_trades_for_month, TradePriceLookupError
 
 load_dotenv()
 

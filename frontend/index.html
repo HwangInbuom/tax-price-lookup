@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리집 세금계산기 (주소 자동조회 연동 데모)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<style>
+  :root{
+    color-scheme: light;
+    --bg: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f1f0ea;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --border: rgba(11,11,11,0.10);
+    --gridline: #e1e0d9;
+    --baseline: #c3c2b7;
+    --current-color: #2a78d6;
+    --current-color-soft: #e4eefb;
+    --reform-color: #d9581f;
+    --reform-color-soft: #fbe9e0;
+    --good: #006300;
+    --critical: #b8231f;
+    --accent: #184f95;
+    --mono-ink: #184f95;
+    --ledger: rgba(11,11,11,0.14);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg: #0d0d0d;
+      --surface: #1a1a19;
+      --surface-2: #232321;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8f8d86;
+      --border: rgba(255,255,255,0.12);
+      --gridline: #2c2c2a;
+      --baseline: #383835;
+      --current-color: #3987e5;
+      --current-color-soft: #14243a;
+      --reform-color: #e2703b;
+      --reform-color-soft: #3a2216;
+      --good: #24b524;
+      --critical: #e66767;
+      --accent: #5a9bef;
+      --mono-ink: #7fb3ff;
+      --ledger: rgba(255,255,255,0.16);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8d86;
+    --border: rgba(255,255,255,0.12);
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --current-color: #3987e5;
+    --current-color-soft: #14243a;
+    --reform-color: #e2703b;
+    --reform-color-soft: #3a2216;
+    --good: #24b524;
+    --critical: #e66767;
+    --accent: #5a9bef;
+    --mono-ink: #7fb3ff;
+    --ledger: rgba(255,255,255,0.16);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text-primary);
+    font-family:"Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{ font-family:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; }
+  .wrap{
+    max-width:880px;
+    margin:0 auto;
+    padding-inline:20px;
+    padding-block:28px 60px;
+  }
+  h1,h2,h3{ text-wrap:balance; margin:0; }
+  .eyebrow{
+    font-size:12.5px;
+    font-weight:700;
+    letter-spacing:.08em;
+    color:var(--accent);
+    text-transform:uppercase;
+  }
+  header.app-header{ margin-bottom:22px; }
+  header.app-header h1{ font-size:28px; font-weight:900; margin-top:6px; }
+  header.app-header p.lede{
+    color:var(--text-secondary);
+    font-size:14.5px;
+    line-height:1.6;
+    margin-top:10px;
+    max-width:60ch;
+  }
+  .notice{
+    margin-top:14px;
+    display:flex;
+    gap:8px;
+    align-items:flex-start;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:11px 13px;
+    font-size:12.5px;
+    color:var(--text-secondary);
+    line-height:1.55;
+  }
+  .notice .dot{ color:var(--reform-color); flex:none; font-size:14px; line-height:1.4; }
+
+  .tabs{
+    display:flex;
+    gap:6px;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:4px;
+    margin-bottom:16px;
+  }
+  .tab-btn{
+    flex:1;
+    border:none;
+    background:transparent;
+    color:var(--text-secondary);
+    font:inherit;
+    font-weight:700;
+    font-size:14.5px;
+    padding:10px 8px;
+    border-radius:9px;
+    cursor:pointer;
+  }
+  .tab-btn[aria-selected="true"]{
+    background:var(--surface);
+    color:var(--text-primary);
+    box-shadow:0 1px 2px var(--border);
+  }
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:18px;
+    margin-bottom:16px;
+  }
+  .card h2{ font-size:15px; font-weight:700; }
+  .card .sub{ color:var(--text-muted); font-size:12.5px; margin-top:3px; }
+
+  .scenario-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:8px;
+    margin-top:14px;
+  }
+  .scenario-btn{
+    text-align:left;
+    border:1.5px solid var(--border);
+    background:var(--surface-2);
+    border-radius:11px;
+    padding:11px 12px;
+    cursor:pointer;
+    font:inherit;
+    color:var(--text-primary);
+  }
+  .scenario-btn strong{ display:block; font-size:13.5px; font-weight:700; }
+  .scenario-btn span{ display:block; font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+  .scenario-btn[aria-pressed="true"]{
+    border-color:var(--accent);
+    background:var(--current-color-soft);
+  }
+  .scenario-btn[aria-pressed="true"] strong{ color:var(--accent); }
+
+  .field-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:12px 14px;
+    margin-top:14px;
+  }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{ font-size:12.5px; font-weight:600; color:var(--text-secondary); }
+  .field .input-row{
+    position:relative;
+    display:flex;
+    align-items:center;
+  }
+  .field input[type="number"]{
+    width:100%;
+    font:inherit;
+    font-size:15px;
+    font-variant-numeric:tabular-nums;
+    padding:9px 40px 9px 11px;
+    border-radius:9px;
+    border:1.5px solid var(--border);
+    background:var(--surface);
+    color:var(--text-primary);
+  }
+  .field input[type="text"]{
+    width:100%;
+    font:inherit;
+    font-size:15px;
+    padding:9px 11px;
+    border-radius:9px;
+    border:1.5px solid var(--border);
+    background:var(--surface);
+    color:var(--text-primary);
+  }
+  .field input[type="number"]:focus, .field input[type="text"]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .field .unit{
+    position:absolute;
+    right:11px;
+    font-size:12.5px;
+    color:var(--text-muted);
+    pointer-events:none;
+  }
+  .field .hint{ font-size:11px; color:var(--text-muted); }
+  .checkbox-field{
+    display:flex; align-items:center; gap:8px;
+    grid-column: 1 / -1;
+    font-size:13px; color:var(--text-secondary);
+  }
+  .checkbox-field input{ width:16px;height:16px; }
+
+  .legend{ display:flex; gap:16px; align-items:center; margin:2px 0 14px; }
+  .legend .item{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-secondary); font-weight:600; }
+  .legend .swatch{ width:10px; height:10px; border-radius:3px; }
+
+  .stat-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .stat-tile{
+    border-radius:12px;
+    padding:14px 14px 12px;
+    border:1.5px solid var(--border);
+    background:var(--surface-2);
+  }
+  .stat-tile.current{ border-color:var(--current-color); }
+  .stat-tile.reform{ border-color:var(--reform-color); }
+  .stat-tile .label{ font-size:12px; font-weight:700; color:var(--text-muted); }
+  .stat-tile.current .label{ color:var(--current-color); }
+  .stat-tile.reform .label{ color:var(--reform-color); }
+  .stat-tile .value{ font-size:22px; font-weight:900; margin-top:6px; line-height:1.15; }
+  .stat-tile .sub{ font-size:11.5px; color:var(--text-muted); margin-top:3px; }
+
+  .delta-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border-radius:11px; padding:12px 14px; margin-bottom:16px;
+    font-size:13.5px; font-weight:700;
+  }
+  .delta-banner.up{ background:color-mix(in srgb, var(--critical) 12%, var(--surface)); color:var(--critical); }
+  .delta-banner.down{ background:color-mix(in srgb, var(--good) 12%, var(--surface)); color:var(--good); }
+  .delta-banner.flat{ background:var(--surface-2); color:var(--text-secondary); }
+  .delta-banner .amt{ font-size:16px; }
+
+  .year-chart{
+    display:flex; align-items:flex-end; gap:6px;
+    height:210px; padding-top:8px;
+    border-bottom:2px solid var(--baseline);
+    margin-bottom:4px;
+  }
+  .year-group{ flex:1; display:flex; flex-direction:column; align-items:center; height:100%; }
+  .year-bars{ flex:1; display:flex; align-items:flex-end; gap:5px; width:100%; justify-content:center; }
+  .ybar-wrap{ display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; width:38%; max-width:34px; }
+  .ybar-val{ font-size:9.5px; font-weight:700; color:var(--text-secondary); margin-bottom:3px; line-height:1.2; text-align:center; font-variant-numeric:tabular-nums; }
+  .ybar{ width:100%; border-radius:5px 5px 0 0; min-height:2px; }
+  .ybar.current{ background:var(--current-color); }
+  .ybar.reform{ background:var(--reform-color); }
+  .year-label{ margin-top:8px; font-size:12.5px; font-weight:700; color:var(--text-secondary); }
+
+  .delta-up{ color:var(--critical); font-weight:700; }
+  .delta-down{ color:var(--good); font-weight:700; }
+  tr.total-row td{ border-top:2px solid var(--border); border-bottom:none; font-weight:800; padding-top:10px; }
+
+  .insight-box{
+    display:flex; gap:8px; align-items:flex-start;
+    background:var(--current-color-soft); border:1px solid var(--border);
+    border-radius:10px; padding:10px 12px; margin-top:14px;
+    font-size:12.5px; color:var(--text-secondary); line-height:1.55;
+  }
+  .insight-box .dot{ color:var(--accent); flex:none; }
+
+  details.breakdown{ margin-top:6px; }
+  details.breakdown > summary{
+    cursor:pointer; font-size:13px; font-weight:700; color:var(--accent);
+    list-style:none; display:flex; align-items:center; gap:5px;
+  }
+  details.breakdown > summary::-webkit-details-marker{ display:none; }
+  details.breakdown > summary::after{ content:"›"; transform:rotate(90deg); transition:transform .15s; font-size:16px; }
+  details.breakdown[open] > summary::after{ transform:rotate(270deg); }
+
+  .table-wrap{ overflow-x:auto; margin-top:12px; }
+  table.calc-table{ width:100%; border-collapse:collapse; font-size:12.5px; min-width:420px; }
+  table.calc-table th, table.calc-table td{
+    text-align:right; padding:8px 6px; border-bottom:1px solid var(--gridline);
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  table.calc-table th:first-child, table.calc-table td:first-child{ text-align:left; font-variant-numeric:normal; white-space:normal; color:var(--text-secondary); font-weight:600; }
+  table.calc-table th{ color:var(--text-muted); font-weight:700; font-size:11.5px; }
+  table.calc-table td.current-col{ color:var(--current-color); }
+  table.calc-table td.reform-col{ color:var(--reform-color); }
+  table.calc-table tr.trade-row-clickable{ cursor:pointer; }
+  table.calc-table tr.trade-row-clickable:hover{ background:var(--hover-bg, rgba(120,120,120,0.08)); }
+  table.calc-table .trade-apply-btn{
+    font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid var(--gridline);
+    background:transparent; color:var(--accent, inherit); cursor:pointer; white-space:nowrap;
+  }
+  table.calc-table .trade-apply-btn:hover{ background:var(--hover-bg, rgba(120,120,120,0.08)); }
+
+  .assump{ margin-top:8px; font-size:12px; color:var(--text-secondary); line-height:1.7; }
+  .assump li{ margin-bottom:3px; }
+
+  footer.disclaimer{
+    margin-top:24px;
+    font-size:11.5px;
+    color:var(--text-muted);
+    line-height:1.7;
+    border-top:1px solid var(--border);
+    padding-top:14px;
+  }
+  footer.disclaimer a{ color:var(--text-muted); }
+
+  @media (max-width:520px){
+    .scenario-grid{ grid-template-columns:1fr; }
+    .field-grid{ grid-template-columns:1fr; }
+    .stat-row{ grid-template-columns:1fr; }
+    .stat-tile .value{ font-size:20px; }
+    .year-chart{ height:170px; gap:3px; }
+    .ybar-val{ font-size:8.5px; }
+    .year-label{ font-size:11px; }
+  }
+
+  /* ---- 계산 과정 검증 섹션 ---- */
+  .year-pills{ display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+  .year-pill{ border:1.5px solid var(--border); background:var(--surface-2); color:var(--text-secondary); font:inherit; font-weight:700; font-size:13px; padding:7px 16px; border-radius:999px; cursor:pointer; }
+  .year-pill[aria-pressed="true"]{ border-color:var(--accent); background:var(--accent); color:#fff; }
+
+  .compare-toolbar{ display:flex; justify-content:flex-end; margin-bottom:8px; }
+  .toggle-all-btn{
+    border:1.5px solid var(--border); background:var(--surface-2); color:var(--text-secondary);
+    font:inherit; font-weight:700; font-size:12px; padding:6px 12px; border-radius:999px; cursor:pointer;
+  }
+  .compare-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .col-head{ display:flex; align-items:center; gap:8px; padding:0 2px 10px; }
+  .col-head .swatch{ width:11px; height:11px; border-radius:3px; flex:none; }
+  .col-head .swatch.current{ background:var(--current-color); }
+  .col-head .swatch.reform{ background:var(--reform-color); }
+  .col-head strong{ font-size:14px; font-weight:800; }
+  .col.current .col-head strong{ color:var(--current-color); }
+  .col.reform .col-head strong{ color:var(--reform-color); }
+
+  details.step{ border-top:1px dashed var(--ledger); padding:2px; }
+  details.step:first-child{ border-top:none; }
+  details.step > summary{
+    cursor:pointer; list-style:none; display:flex; align-items:baseline; justify-content:space-between;
+    gap:10px; padding:10px 2px; -webkit-tap-highlight-color:transparent;
+  }
+  details.step > summary::-webkit-details-marker{ display:none; }
+  details.step > summary::before{
+    content:"›"; display:inline-block; transform:rotate(0deg); transition:transform .15s;
+    font-size:15px; color:var(--text-muted); flex:none; margin-right:2px;
+  }
+  details.step[open] > summary::before{ transform:rotate(90deg); }
+  details.step > summary .summary-main{ display:flex; align-items:baseline; gap:8px; min-width:0; }
+  .step .step-label{ font-size:12.5px; font-weight:700; color:var(--text-secondary); white-space:nowrap; }
+  .step .step-body{ padding:0 2px 12px 21px; }
+  .step .formula{
+    font-size:12px; color:var(--mono-ink); background:var(--surface-2); border:1px solid var(--border);
+    border-radius:8px; padding:8px 10px; line-height:1.55; white-space:pre-wrap; word-break:break-word;
+  }
+  .step .sub{ font-size:11.5px; color:var(--text-muted); margin-top:6px; line-height:1.6; white-space:pre-wrap; word-break:break-word; }
+  .step .result{ font-size:14.5px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; flex:none; }
+  .col.current .step .result{ color:var(--current-color); }
+  .col.reform .step .result{ color:var(--reform-color); }
+
+  .bracket-table{ width:100%; border-collapse:collapse; margin-top:8px; font-size:11px; }
+  .bracket-table th, .bracket-table td{ text-align:right; padding:4px 5px; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .bracket-table th:first-child, .bracket-table td:first-child{ text-align:left; }
+  .bracket-table th{ color:var(--text-muted); font-weight:700; }
+
+  .final-compare{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    border-radius:11px; padding:14px 16px; margin-top:14px; background:var(--surface-2); border:1px solid var(--border);
+  }
+  .final-compare .fc-item{ display:flex; flex-direction:column; gap:2px; }
+  .final-compare .fc-item .fc-label{ font-size:11.5px; font-weight:700; color:var(--text-muted); }
+  .final-compare .fc-item .fc-val{ font-size:17px; font-weight:900; font-variant-numeric:tabular-nums; }
+  .final-compare .fc-item.current .fc-val{ color:var(--current-color); }
+  .final-compare .fc-item.reform .fc-val{ color:var(--reform-color); }
+  .final-compare .fc-diff{ font-size:13.5px; font-weight:800; padding:6px 12px; border-radius:8px; font-variant-numeric:tabular-nums; }
+  .final-compare .fc-diff.up{ background:color-mix(in srgb, var(--critical) 14%, transparent); color:var(--critical); }
+  .final-compare .fc-diff.down{ background:color-mix(in srgb, var(--good) 14%, transparent); color:var(--good); }
+  .final-compare .fc-diff.flat{ background:var(--surface); color:var(--text-secondary); }
+
+  @media (max-width:520px){ .compare-grid{ grid-template-columns:1fr; } }
+
+  .addr-card{ border-color:var(--accent); }
+  .addr-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr 1fr;
+    gap:10px 12px;
+    margin-top:12px;
+  }
+  @media (max-width:520px){ .addr-grid{ grid-template-columns:1fr 1fr 1fr; } }
+  .addr-grid .field{ margin:0; }
+  .addr-actions{ margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .addr-btn{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:10px 16px;
+    font:inherit;
+    font-weight:700;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .addr-btn:disabled{ opacity:0.55; cursor:default; }
+  .addr-status{ font-size:12.5px; color:var(--text-muted); }
+  .addr-status.ok{ color:var(--good); font-weight:600; }
+  .addr-status.warn{ color:var(--reform-color); font-weight:600; }
+  .addr-status.err{ color:var(--critical); font-weight:600; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="app-header">
+    <div class="eyebrow">2026 주택세 개편안 시뮬레이터</div>
+    <h1>우리집 세금계산기</h1>
+    <p class="lede">2026년 발표된 주택 세제개편안은 2027~2030년에 걸쳐 단계적으로 시행됩니다. 종합부동산세는 계속 보유할 경우 해마다 부담이 어떻게 바뀌는지, 양도소득세는 어느 해에 매도하는지에 따라 세액이 어떻게 달라지는지를 연도별로 비교해봅니다.</p>
+    <div class="notice">
+      <span class="dot">●</span>
+      <span>이 계산기는 기획재정부가 2026년 8월 3일 발표한 「2026년 세제개편안」(국회 심의 중, 시행 전)을 바탕으로 한 <strong>개략적 추정치</strong>입니다. 실제 고지세액과 다를 수 있으며, 법 개정 과정에서 수치가 바뀔 수 있습니다. 정확한 세액은 홈택스 또는 세무 전문가 상담을 통해 확인하세요.</span>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab-btn" id="tabBtnJb" role="tab" aria-selected="true">종합부동산세</button>
+    <button class="tab-btn" id="tabBtnYd" role="tab" aria-selected="false">양도소득세</button>
+  </div>
+
+  <div class="card">
+    <h2>주택 보유 유형</h2>
+    <div class="sub">아래 4가지 중 현재 상황에 가장 가까운 유형을 선택하세요</div>
+    <div class="scenario-grid" id="scenarioGrid"></div>
+  </div>
+
+  <div class="card addr-card">
+    <h2 id="addrCardTitle">주소로 공시가격 자동 조회 (베타)</h2>
+    <div class="sub" id="addrCardSub">아파트·연립주택만 지원됩니다. 조회 결과는 "공시가격" 칸에 자동으로 채워집니다. 이 기능을 쓰려면 로컬에서 백엔드 서버(<code>uvicorn main:app --port 8000</code>)가 켜져 있어야 합니다.</div>
+    <div class="addr-grid">
+      <div class="field"><label for="addrInput">주소</label>
+        <div class="input-row" style="gap:6px;">
+          <input type="text" id="addrInput" placeholder="주소 검색 버튼을 눌러주세요" readonly style="background:var(--surface-2); flex:1 1 auto; width:auto;">
+          <button type="button" class="addr-btn" id="addrSearchBtn" style="white-space:nowrap; flex:0 0 auto; padding:9px 14px;">주소 검색</button>
+        </div>
+      </div>
+      <div class="field"><label for="addrDong">동</label>
+        <div class="input-row"><input type="text" id="addrDong" placeholder="예: 104"></div>
+      </div>
+      <div class="field"><label for="addrHo">호</label>
+        <div class="input-row"><input type="text" id="addrHo" placeholder="예: 402"></div>
+      </div>
+    </div>
+
+    <!-- 종합부동산세 탭에서만 보임 -->
+    <div class="addr-actions" id="jbAddrActions">
+      <button type="button" class="addr-btn" id="addrLookupBtn">공시가격 불러오기</button>
+    </div>
+
+    <!-- 다주택자(2주택·3주택 이상) 시나리오에서만 보임: 보유주택을 하나씩 등록해서 합계를 자동 계산 -->
+    <div id="jbHouseSection" hidden style="margin-top:10px;">
+      <div class="sub" style="margin-bottom:8px;">
+        위에서 주소를 조회한 뒤 "목록에 추가"를 누르면 보유주택으로 등록되고, 합계·작년 합계가 자동으로 계산돼서
+        아래 입력 칸에 반영됩니다. 단독주택 등 자동조회가 안 되거나 주소를 모르는 주택은 직접 입력으로 추가하세요.
+      </div>
+      <div class="addr-grid" style="grid-template-columns:1.3fr 0.9fr auto; align-items:flex-end;">
+        <div class="field"><label for="jbManualLabel">주택 이름/메모 (선택)</label>
+          <div class="input-row"><input type="text" id="jbManualLabel" placeholder="예: 단독주택, 부모님 명의 오피스텔"></div>
+        </div>
+        <div class="field"><label for="jbManualPrice">공시가격</label>
+          <div class="input-row"><input type="number" id="jbManualPrice" step="0.1" min="0"><span class="unit">억원</span></div>
+        </div>
+        <button type="button" class="addr-btn" id="jbManualAddBtn" style="background:var(--surface-2); color:var(--text-primary); border:1.5px solid var(--border); white-space:nowrap;">직접 입력으로 추가</button>
+      </div>
+      <div id="jbHouseList" style="margin-top:10px;"></div>
+      <div id="jbHouseSum" class="sub" style="margin-top:8px; font-weight:700;"></div>
+    </div>
+
+    <!-- 양도소득세 탭에서만 보임 -->
+    <div id="ydAddrSection" hidden>
+      <div class="addr-actions">
+        <button type="button" class="addr-btn" id="tradeLookupBtn" style="background:var(--surface-2); color:var(--text-primary); border:1.5px solid var(--border);">최근 6개월 실거래가 참고 보기</button>
+      </div>
+      <div class="addr-grid" style="grid-template-columns:1fr 1fr; margin-top:12px;">
+        <div class="field"><label for="acqYearMonth">취득시기(연월)</label>
+          <div class="input-row"><input type="text" id="acqYearMonth" placeholder="예: 202103 (2021년 3월)"></div>
+          <span class="hint">언제 취득했는지 정확한 금액이 기억 안 나면, 그 시기 실거래가를 참고해보세요</span>
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button type="button" class="addr-btn" id="acqTradeLookupBtn" style="background:var(--surface-2); color:var(--text-primary); border:1.5px solid var(--border); width:100%;">취득 당시 실거래가 조회</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="addr-actions" style="margin-top:4px;"><span class="addr-status" id="addrStatus"></span></div>
+
+    <div id="tradeResultBox" hidden style="margin-top:8px;">
+      <div class="sub" style="margin-bottom:6px;">최근 실거래가는 참고용 시세일 뿐, 양도소득세 계산에 쓰이는 취득가액·양도가액은 실제 본인 계약금액을 직접 입력해야 합니다.</div>
+      <div class="table-wrap"><table class="calc-table" id="tradeTable"></table></div>
+    </div>
+
+    <div id="acqTradeResultBox" hidden style="margin-top:8px;">
+      <div class="sub" style="margin-bottom:6px;">입력한 취득시기 전후로 같은 지번(단지)의 실거래 내역입니다. 참고용이며, 실제 취득가액은 본인 계약서 금액을 입력하세요.</div>
+      <div class="table-wrap"><table class="calc-table" id="acqTradeTable"></table></div>
+    </div>
+  </div>
+
+  <div class="card" id="inputCard"></div>
+
+  <div class="card" id="resultCard">
+    <h2 id="resultTitle">계산 결과</h2>
+    <div class="sub" id="resultSub" style="margin-bottom:10px;"></div>
+    <div class="legend">
+      <span class="item"><span class="swatch" style="background:var(--current-color)"></span>현행 유지 가정 (개편이 없었다면)</span>
+      <span class="item"><span class="swatch" style="background:var(--reform-color)"></span>개편안 적용 (연도별 시행 기준)</span>
+    </div>
+    <div class="stat-row">
+      <div class="stat-tile current">
+        <div class="label" id="labelCurrent">2030년 · 현행 유지 가정</div>
+        <div class="value" id="valCurrent">-</div>
+        <div class="sub" id="subCurrent"></div>
+      </div>
+      <div class="stat-tile reform">
+        <div class="label" id="labelReform">2030년 · 개편안 적용</div>
+        <div class="value" id="valReform">-</div>
+        <div class="sub" id="subReform"></div>
+      </div>
+    </div>
+    <div class="delta-banner flat" id="deltaBanner">
+      <span id="deltaText">주택 정보를 입력하면 결과가 표시됩니다</span>
+      <span class="amt" id="deltaAmt"></span>
+    </div>
+
+    <h2 style="margin-top:20px;font-size:14px;">연도별 비교 (2027~2030)</h2>
+    <div id="barChart"></div>
+    <div class="table-wrap">
+      <table class="calc-table" id="summaryTable"></table>
+    </div>
+    <div class="insight-box" id="insightBox" hidden>
+      <span class="dot">💡</span>
+      <span id="insightText"></span>
+    </div>
+
+    <details class="breakdown">
+      <summary>연도별 계산 상세 보기 (개편안 적용 기준)</summary>
+      <div class="table-wrap">
+        <table class="calc-table" id="calcTable"></table>
+      </div>
+      <ul class="assump" id="assumpList"></ul>
+    </details>
+  </div>
+
+  <div class="card" id="verifyCard">
+    <h2 id="compareTitle">계산 과정 검증</h2>
+    <div class="sub" id="compareSub"></div>
+    <div class="year-pills" id="yearPills"></div>
+    <div class="compare-toolbar" style="margin-top:14px;"><button type="button" class="toggle-all-btn" id="toggleAllBtn">모두 펼치기</button></div>
+    <div class="compare-grid" id="compareGrid"></div>
+    <div class="final-compare" id="finalCompare"></div>
+  </div>
+
+  <footer class="disclaimer">
+    <p><strong>주요 가정:</strong> 종부세 공시가격은 작년(2025년) 대비 올해(2026년) 상승률을 계산해서, 그 비율이 2027~2030년에도 매년 복리로 그대로 이어진다고 가정합니다. 양도세 취득가액·양도가액은 매도 연도와 무관하게 동일하다고 가정합니다(시세 변동 미반영). 나이·보유기간·거주기간은 입력값을 2026년 기준으로 보고 연도마다 1년씩 자동으로 늘려 계산합니다. 종부세는 2027년(경과조치)과 2028년 이후(완전시행) 규정을, 양도세는 2027·2028·2029년(경과조치)과 2030년(완전시행 유지) 규정을 연도별로 각각 적용했습니다. 종부세 세부담 상한(150%→200%), 고령자 수도권 이주 한시 감면, 일시적 2주택 특례기간 단축 등 개별 특례는 반영하지 않았습니다.</p>
+    <p>참고: 기획재정부 「2026년 세제개편안」(2026.8.3. 발표) 보도자료 기준으로 작성. 최종 세율·공제는 국회 통과 법안에 따라 달라질 수 있습니다. · 마지막 업데이트 2026-09</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- formatting helpers ----------
+  function formatEok(won){
+    var sign = won < 0 ? "-" : "";
+    won = Math.round(Math.abs(won));
+    var eok = Math.floor(won/1e8);
+    var man = Math.round((won - eok*1e8)/1e4);
+    if(eok>0 && man>0) return sign+eok.toLocaleString("ko-KR")+"억 "+man.toLocaleString("ko-KR")+"만원";
+    if(eok>0) return sign+eok.toLocaleString("ko-KR")+"억원";
+    if(man>0) return sign+man.toLocaleString("ko-KR")+"만원";
+    return "0원";
+  }
+  function formatWon(n){ return Math.round(n).toLocaleString("ko-KR")+"원"; }
+  function formatPct(p){ return (Math.round(p*1000)/10).toLocaleString("ko-KR")+"%"; }
+  function eok(n){ return n*1e8; }
+  function clamp(n,lo,hi){ return Math.max(lo,Math.min(hi,n)); }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  // ---------- progressive tax helper ----------
+  function progressiveTax(base, table){
+    var tax = 0;
+    for(var i=0;i<table.length;i++){
+      var lo=table[i][0], hi=table[i][1], rate=table[i][2];
+      if(base>lo){ tax += (Math.min(base,hi)-lo)*rate; }
+    }
+    return Math.max(0,tax);
+  }
+  function jbBracketBreakdown(base, table){
+    var rows = [];
+    for(var i=0;i<table.length;i++){
+      var lo=table[i][0], hi=table[i][1], rate=table[i][2];
+      if(base>lo){
+        var amt = Math.min(base,hi)-lo;
+        rows.push({lo:lo, hi:hi, rate:rate, amt:amt, tax:amt*rate});
+      }
+    }
+    return rows;
+  }
+  function bracketTax(base, table){
+    // table rows: [lo, hi, rate, deduction]
+    for(var i=0;i<table.length;i++){
+      var lo=table[i][0], hi=table[i][1], rate=table[i][2], ded=table[i][3];
+      if(base>=lo && base<hi) return {rate:rate, ded:ded, tax:Math.max(0, base*rate-ded)};
+    }
+    return {rate:0, ded:0, tax:0};
+  }
+  function ydBracketLookup(base, table){ return bracketTax(base, table); }
+
+  // ---------- rate tables (종부세) ----------
+  var JB_NORMAL_CURRENT = [ // 1~2주택, 현행
+    [0, eok(3), 0.005], [eok(3), eok(6), 0.007], [eok(6), eok(12), 0.010],
+    [eok(12), eok(25), 0.013], [eok(25), eok(50), 0.015], [eok(50), eok(94), 0.020],
+    [eok(94), Infinity, 0.027]
+  ];
+  var JB_MULTI_CURRENT = [ // 3주택 이상, 현행
+    [0, eok(3), 0.005], [eok(3), eok(6), 0.007], [eok(6), eok(12), 0.010],
+    [eok(12), eok(25), 0.020], [eok(25), eok(50), 0.030], [eok(50), eok(94), 0.040],
+    [eok(94), Infinity, 0.050]
+  ];
+  var JB_UNIFIED_REFORM = [ // 개편후, 주택수 무관 통합세율(2028년 이후 최종)
+    [0, eok(3), 0.005], [eok(3), eok(6), 0.007], [eok(6), eok(12), 0.013],
+    [eok(12), eok(25), 0.020], [eok(25), eok(50), 0.030], [eok(50), eok(94), 0.040],
+    [eok(94), Infinity, 0.050]
+  ];
+  var JB_NORMAL_2027 = [ // 1·2주택, 2027년 경과조치
+    [0, eok(3), 0.005], [eok(3), eok(6), 0.007], [eok(6), eok(12), 0.013],
+    [eok(12), eok(25), 0.015], [eok(25), eok(50), 0.020], [eok(50), eok(94), 0.027],
+    [eok(94), Infinity, 0.035]
+  ];
+  var JB_MULTI_2027 = [ // 3주택 이상, 2027년 경과조치
+    [0, eok(3), 0.005], [eok(3), eok(6), 0.007], [eok(6), eok(12), 0.013],
+    [eok(12), eok(25), 0.020], [eok(25), eok(50), 0.030], [eok(50), eok(94), 0.040],
+    [eok(94), Infinity, 0.050]
+  ];
+
+  function jbAgeRate(age){ if(age>=70) return 0.40; if(age>=65) return 0.30; if(age>=60) return 0.20; return 0; }
+  function jbHoldRate(y){ if(y>=15) return 0.50; if(y>=10) return 0.40; if(y>=5) return 0.20; return 0; }
+
+  // 종부세: 연도별 계산. inputs 값은 "2026년 기준"이며, year-2026 만큼 나이·보유(거주)기간을 자동 증가시킴
+  function calcJongbuYear(scenario, inputs, year){
+    var isSingle = (scenario==="res1" || scenario==="nonres1");
+    var isMulti3 = (scenario==="multi3");
+    var elapsed = year - 2026;
+    var age = (inputs.age||0) + elapsed;
+    var yrs = (inputs.holdYears||0) + elapsed; // 보유기간=거주기간 동일 가정(계속 실거주 중)
+    var baseTotal = eok(inputs.totalPrice||0);
+    var prevTotal = eok(inputs.prevTotalPrice||0);
+    var growthRate = prevTotal>0 ? Math.max(0, (baseTotal-prevTotal)/prevTotal) : 0; // 하락한 경우 0%로 취급(계속 하락한다고 가정하지 않음)
+    var growthFactor = Math.pow(1+growthRate, elapsed);
+    var totalPrice = baseTotal * growthFactor;
+    var residPrice = eok(inputs.residPrice||0) * growthFactor;
+
+    // ---- 현행 유지 가정 (개편이 없었다면 해당 연도에도 2026년 규정 적용) ----
+    var curDeduct = isSingle ? eok(12) : eok(9);
+    var curRatio = 0.60;
+    var curBase = Math.max(0, totalPrice - curDeduct) * curRatio;
+    var curTable = isMulti3 ? JB_MULTI_CURRENT : JB_NORMAL_CURRENT;
+    var curGross = progressiveTax(curBase, curTable);
+    var curCredit = 0;
+    if(isSingle){
+      var combinedCur = clamp(jbAgeRate(age) + jbHoldRate(yrs), 0, 0.80);
+      curCredit = curGross * combinedCur;
+    }
+    var curFinal = Math.max(0, curGross - curCredit);
+
+    // ---- 개편안 적용 (해당 연도 규정) ----
+    var refDeduct;
+    if(scenario==="res1"){ refDeduct = eok(14); }
+    else if(scenario==="nonres1"){ refDeduct = eok(9); }
+    else { var ratio = totalPrice>0 ? clamp(residPrice/totalPrice,0,1) : 0; refDeduct = eok(4) + eok(5)*ratio; }
+
+    var refRatio;
+    if(year<=2027){ refRatio = 0.70; } // 1·2주택, 3주택+ 모두 '27년엔 70%
+    else { refRatio = isSingle ? 0.70 : ((isMulti3 || inputs.adjustedArea) ? 0.80 : 0.70); }
+
+    var refTable;
+    if(year<=2027){ refTable = isMulti3 ? JB_MULTI_2027 : JB_NORMAL_2027; }
+    else { refTable = JB_UNIFIED_REFORM; }
+
+    var refBase = Math.max(0, totalPrice - refDeduct) * refRatio;
+    var refGross = progressiveTax(refBase, refTable);
+    var refCredit = 0;
+    if(isSingle){
+      var combinedRef, creditCap;
+      if(year<=2027){
+        var optHalfHold = jbHoldRate(yrs) / 2; // 보유공제의 1/2
+        var optReside = jbHoldRate(yrs);        // 거주공제(동일 구간표, 거주연수 기준)
+        combinedRef = clamp(jbAgeRate(age) + Math.max(optHalfHold, optReside), 0, 0.80);
+        creditCap = 8000000;
+      } else {
+        combinedRef = clamp(jbAgeRate(age) + jbHoldRate(yrs), 0, 0.80);
+        creditCap = 6000000;
+      }
+      refCredit = Math.min(refGross * combinedRef, creditCap);
+    }
+    var refFinal = Math.max(0, refGross - refCredit);
+
+    return {
+      year: year,
+      totalPrice: totalPrice, residPrice: residPrice,
+      current: { deduct:curDeduct, ratio:curRatio, base:curBase, gross:curGross, credit:curCredit, final:curFinal },
+      reform:  { deduct:refDeduct, ratio:refRatio, base:refBase, gross:refGross, credit:refCredit, final:refFinal }
+    };
+  }
+
+  // ---------- 양도소득세 ----------
+  var GT_TABLE = [ // [lo, hi, rate, 누진공제]
+    [0, 12000000, 0.06, 0],
+    [12000000, 46000000, 0.15, 1080000],
+    [46000000, 88000000, 0.24, 5220000],
+    [88000000, 150000000, 0.35, 14900000],
+    [150000000, 300000000, 0.38, 19400000],
+    [300000000, 500000000, 0.40, 25400000],
+    [500000000, 1000000000, 0.42, 35400000],
+    [1000000000, Infinity, 0.45, 65400000]
+  ];
+
+  function holdRateCurrent(y){ if(y<3) return 0; return Math.min(0.40, (Math.floor(y)-3)*0.04+0.12); }
+  function resideRateCurrent(y){ if(y<2) return 0; return Math.min(0.40, (Math.floor(y)-2)*0.04+0.08); }
+  function resideRateReformFinal(y){ if(y<1) return 0; return Math.min(0.80, Math.floor(y)*0.08); } // '29년~: 거주 연8%, 최대 80%(10년)
+  function generalLtcgRate(y){ if(y<3) return 0; return Math.min(0.30, (Math.floor(y)-3)*0.02+0.06); } // 다주택 거주(연2%,최대30%,15년)
+  function holdRate1pct(y){ if(y<3) return 0; return Math.min(0.15, (Math.floor(y)-3)*0.01+0.03); } // 다주택 '28년 보유 연1%,최대15%
+
+  // 양도세: 연도별 계산. inputs 값은 "2026년 기준" 보유·거주기간이며, 그 해에 매도한다고 가정하고 연수를 늘려 계산
+  function calcTransferYear(scenario, inputs, year){
+    var acq = eok(inputs.acqPrice||0);
+    var sale = eok(inputs.salePrice||0);
+    var expense = eok(inputs.expense||0);
+    var elapsed = year - 2026;
+    var hold = (inputs.holdYears||0) + elapsed;
+    var resid = (inputs.residYears!=null ? inputs.residYears : 0) + elapsed;
+    var isSingle = (scenario==="res1" || scenario==="nonres1");
+    var adjustedArea = !!inputs.adjustedArea;
+    var finalSurcharge = scenario==="multi3" ? 0.30 : (scenario==="multi2" ? 0.20 : 0);
+
+    var gain = Math.max(0, sale - acq - expense);
+    var taxableGain = isSingle ? (sale<=eok(12) ? 0 : gain*(sale-eok(12))/sale) : gain;
+
+    // ---- 현행 유지 가정 (개편이 없었다면 그 해에도 2026년 규정 적용) ----
+    var curLtcgRate = isSingle
+      ? clamp(holdRateCurrent(hold)+resideRateCurrent(resid), 0, 0.80)
+      : (adjustedArea ? 0 : generalLtcgRate(hold));
+    var curLtcgAmt = taxableGain*curLtcgRate;
+    var curBasic = 2500000;
+    var curBase = Math.max(0, taxableGain - curLtcgAmt - curBasic);
+    var curBr = bracketTax(curBase, GT_TABLE);
+    var curExtra = (!isSingle && adjustedArea) ? finalSurcharge : 0;
+    var curTax = Math.max(0, curBase*(curBr.rate+curExtra) - curBr.ded);
+    var curLocal = curTax*0.10;
+
+    // ---- 개편안 적용 (해당 연도 규정) ----
+    var refLtcgRate, refCapAmt, refSurchargeRate;
+    if(year<=2027){
+      refLtcgRate = isSingle
+        ? clamp(holdRateCurrent(hold)+resideRateCurrent(resid), 0, 0.80)
+        : (adjustedArea ? 0 : generalLtcgRate(hold));
+      refCapAmt = Infinity;
+      refSurchargeRate = scenario==="multi3" ? 0.10 : (scenario==="multi2" ? 0.05 : 0);
+    } else if(year===2028){
+      refLtcgRate = isSingle
+        ? Math.min(0.80, Math.floor(resid)*0.06 + Math.floor(hold)*0.02)
+        : (adjustedArea ? 0 : Math.max(holdRate1pct(hold), generalLtcgRate(resid)));
+      refCapAmt = eok(20);
+      refSurchargeRate = scenario==="multi3" ? 0.15 : (scenario==="multi2" ? 0.10 : 0);
+    } else { // 2029, 2030 (완전 시행 유지)
+      refLtcgRate = isSingle ? resideRateReformFinal(resid) : (adjustedArea ? 0 : generalLtcgRate(resid));
+      refCapAmt = eok(10);
+      refSurchargeRate = finalSurcharge;
+    }
+    var refLtcgAmt = Math.min(taxableGain*refLtcgRate, refCapAmt);
+    var refBasic = (isSingle && resid>=10 && sale<=eok(30)) ? 25000000 : 2500000; // 10년 이상 거주 + 30억 이하 특례
+    var refBase = Math.max(0, taxableGain - refLtcgAmt - refBasic);
+    var refBr = bracketTax(refBase, GT_TABLE);
+    var refExtra = (!isSingle && adjustedArea) ? refSurchargeRate : 0;
+    var refTax = Math.max(0, refBase*(refBr.rate+refExtra) - refBr.ded);
+    var refLocal = refTax*0.10;
+
+    return {
+      year: year, taxableGain: taxableGain,
+      current: { ltcgRate:curLtcgRate, ltcgAmt:curLtcgAmt, basic:curBasic, base:curBase, rate:curBr.rate+curExtra, tax:curTax, local:curLocal, total:curTax+curLocal },
+      reform:  { ltcgRate:refLtcgRate, ltcgAmt:refLtcgAmt, basic:refBasic, base:refBase, rate:refBr.rate+refExtra, tax:refTax, local:refLocal, total:refTax+refLocal }
+    };
+  }
+
+  // ---------- 검증용: 단계별 도출(공식 + 대입 숫자) ----------
+  function jbDerive(scenario, inputs, year, mode){
+    var isSingle = (scenario==="res1" || scenario==="nonres1");
+    var isMulti3 = (scenario==="multi3");
+    var elapsed = year - 2026;
+    var age = (inputs.age||0) + elapsed;
+    var yrs = (inputs.holdYears||0) + elapsed;
+    var baseTotalPrice = eok(inputs.totalPrice||0);
+    var prevTotalPrice = eok(inputs.prevTotalPrice||0);
+    var rawGrowthRate = prevTotalPrice>0 ? (baseTotalPrice-prevTotalPrice)/prevTotalPrice : 0;
+    var growthRate = Math.max(0, rawGrowthRate); // 하락한 경우 0%로 취급(계속 하락한다고 가정하지 않음)
+    var growthFactor = Math.pow(1+growthRate, elapsed);
+    var totalPrice = baseTotalPrice * growthFactor;
+    var residPrice = eok(inputs.residPrice||0) * growthFactor;
+
+    var deduct, ratio, table;
+    if(mode==="current"){
+      deduct = isSingle ? eok(12) : eok(9);
+      ratio = 0.60;
+      table = isMulti3 ? JB_MULTI_CURRENT : JB_NORMAL_CURRENT;
+    } else {
+      if(scenario==="res1"){ deduct = eok(14); }
+      else if(scenario==="nonres1"){ deduct = eok(9); }
+      else { var r2 = totalPrice>0 ? clamp(residPrice/totalPrice,0,1) : 0; deduct = eok(4)+eok(5)*r2; }
+      if(year<=2027){ ratio = 0.70; }
+      else { ratio = isSingle ? 0.70 : ((isMulti3 || inputs.adjustedArea) ? 0.80 : 0.70); }
+      table = year<=2027 ? (isMulti3 ? JB_MULTI_2027 : JB_NORMAL_2027) : JB_UNIFIED_REFORM;
+    }
+
+    var steps = [];
+    var clamped = rawGrowthRate < 0;
+    steps.push({
+      label: "① 공시가격 (전년도 대비 상승률 반영)",
+      formula: "연간 상승률 = (올해 공시가격 − 작년 공시가격) ÷ 작년 공시가격, 단 하락(음수)이면 0%로 취급\n해당 연도 공시가격 = 올해(2026년) 공시가격 × (1 + 연간 상승률)^(연도−2026)",
+      sub: "연간 상승률 = ("+formatEok(baseTotalPrice)+" − "+formatEok(prevTotalPrice)+") ÷ "+formatEok(prevTotalPrice)+" = "+formatPct(rawGrowthRate)+(clamped ? " → 하락이므로 0%로 적용" : "")+"\n해당 연도 공시가격 = "+formatEok(baseTotalPrice)+" × (1 + "+formatPct(growthRate)+")^"+elapsed+" = "+formatEok(totalPrice),
+      result: formatEok(totalPrice)
+    });
+
+    var base = Math.max(0, totalPrice-deduct)*ratio;
+    var deductLabel = (mode==="reform" && !isSingle)
+      ? "기본공제 = 4억원 + 5억원 × (실거주주택 공시가격 ÷ 보유주택 공시가격 합계) = 4억 + 5억 × "+formatPct(totalPrice>0?clamp(residPrice/totalPrice,0,1):0)
+      : null;
+    steps.push({
+      label: "② 과세표준",
+      formula: "과세표준 = max(0, 공시가격 합계 − 기본공제) × 공정시장가액비율"+(deductLabel? ("\n["+deductLabel+"]") : ""),
+      sub: "= max(0, "+formatEok(totalPrice)+" − "+formatEok(deduct)+") × "+formatPct(ratio),
+      result: formatEok(base)
+    });
+
+    var bracketRows = jbBracketBreakdown(base, table);
+    var gross = bracketRows.reduce(function(s,r){ return s+r.tax; }, 0);
+    steps.push({
+      label: "③ 산출세액 (누진세율)",
+      formula: "산출세액 = Σ (해당 구간 과세표준 × 구간세율)",
+      bracketRows: bracketRows,
+      result: formatEok(gross)
+    });
+
+    var credit = 0, creditFormula = "", creditSub = "";
+    if(isSingle){
+      if(mode==="current"){
+        var combined = clamp(jbAgeRate(age)+jbHoldRate(yrs), 0, 0.80);
+        credit = gross*combined;
+        creditFormula = "세액공제 = 산출세액 × (연령공제율 + 보유공제율), 합산 한도 80%";
+        creditSub = "= "+formatEok(gross)+" × ("+formatPct(jbAgeRate(age))+" + "+formatPct(jbHoldRate(yrs))+") = "+formatEok(gross)+" × "+formatPct(combined)+"\n(나이 "+age+"세 → 연령공제 "+formatPct(jbAgeRate(age))+", 보유 "+yrs+"년 → 보유공제 "+formatPct(jbHoldRate(yrs))+")";
+      } else if(year<=2027){
+        var optHalf = jbHoldRate(yrs)/2, optResid = jbHoldRate(yrs);
+        var combinedR = clamp(jbAgeRate(age)+Math.max(optHalf,optResid), 0, 0.80);
+        credit = Math.min(gross*combinedR, 8000000);
+        creditFormula = "세액공제 = min(산출세액 × (연령공제율 + max(보유공제×1/2, 거주공제)), 800만원)";
+        creditSub = "= min("+formatEok(gross)+" × ("+formatPct(jbAgeRate(age))+" + max("+formatPct(optHalf)+", "+formatPct(optResid)+")), 800만원)";
+      } else {
+        var combinedR2 = clamp(jbAgeRate(age)+jbHoldRate(yrs), 0, 0.80);
+        credit = Math.min(gross*combinedR2, 6000000);
+        creditFormula = "세액공제 = min(산출세액 × (연령공제율 + 거주공제율), 600만원)";
+        creditSub = "= min("+formatEok(gross)+" × ("+formatPct(jbAgeRate(age))+" + "+formatPct(jbHoldRate(yrs))+"), 600만원)";
+      }
+      steps.push({ label:"④ 세액공제", formula:creditFormula, sub:creditSub, result: formatEok(credit) });
+    }
+
+    var final = Math.max(0, gross-credit);
+    steps.push({
+      label: isSingle ? "⑤ 결정세액" : "④ 결정세액",
+      formula: "결정세액 = 산출세액 − 세액공제",
+      sub: "= "+formatEok(gross)+" − "+formatEok(credit),
+      result: formatEok(final)
+    });
+
+    return { steps: steps, final: final };
+  }
+
+  function ydDerive(scenario, inputs, year, mode){
+    var acq = eok(inputs.acqPrice||0), sale = eok(inputs.salePrice||0), expense = eok(inputs.expense||0);
+    var elapsed = year - 2026;
+    var hold = (inputs.holdYears||0) + elapsed;
+    var resid = (inputs.residYears!=null ? inputs.residYears : 0) + elapsed;
+    var isSingle = (scenario==="res1" || scenario==="nonres1");
+    var adjustedArea = !!inputs.adjustedArea;
+    var finalSurcharge = scenario==="multi3" ? 0.30 : (scenario==="multi2" ? 0.20 : 0);
+
+    var steps = [];
+    var gain = Math.max(0, sale-acq-expense);
+    steps.push({
+      label:"① 양도차익", formula:"양도차익 = 양도가액 − 취득가액 − 필요경비",
+      sub:"= "+formatEok(sale)+" − "+formatEok(acq)+" − "+formatEok(expense),
+      result: formatEok(gain)
+    });
+
+    var taxableGain;
+    if(isSingle){
+      if(sale<=eok(12)){
+        taxableGain = 0;
+        steps.push({ label:"② 과세대상 양도차익", formula:"1세대1주택 비과세 특례: 양도가액이 12억원 이하이면 과세대상 양도차익 = 0", sub:"양도가액 "+formatEok(sale)+" ≤ 12억원", result: formatEok(0) });
+      } else {
+        taxableGain = gain*(sale-eok(12))/sale;
+        steps.push({ label:"② 과세대상 양도차익", formula:"과세대상 양도차익 = 양도차익 × (양도가액 − 12억원) ÷ 양도가액", sub:"= "+formatEok(gain)+" × ("+formatEok(sale)+" − 12억원) ÷ "+formatEok(sale), result: formatEok(taxableGain) });
+      }
+    } else {
+      taxableGain = gain;
+      steps.push({ label:"② 과세대상 양도차익", formula:"다주택자는 전액 과세 → 과세대상 양도차익 = 양도차익", sub:"= "+formatEok(gain), result: formatEok(taxableGain) });
+    }
+
+    var ltcgRate, capAmt, surchargeRate, ltcgLabel;
+    if(mode==="current"){
+      ltcgRate = isSingle ? clamp(holdRateCurrent(hold)+resideRateCurrent(resid),0,0.80) : (adjustedArea?0:generalLtcgRate(hold));
+      capAmt = Infinity;
+      surchargeRate = (!isSingle && adjustedArea) ? finalSurcharge : 0;
+      ltcgLabel = isSingle
+        ? "장특공제율(현행) = min(보유연수기준 공제,40%) + min(거주연수기준 공제,40%), 합산 한도 80%"
+        : (adjustedArea ? "조정대상지역 다주택자는 장특공제 배제 → 0%" : "장특(보유)공제율(현행) = (보유연수−3)×2%, 최대 30%(15년)");
+    } else if(year<=2027){
+      ltcgRate = isSingle ? clamp(holdRateCurrent(hold)+resideRateCurrent(resid),0,0.80) : (adjustedArea?0:generalLtcgRate(hold));
+      capAmt = Infinity;
+      surchargeRate = scenario==="multi3" ? 0.10 : (scenario==="multi2" ? 0.05 : 0);
+      ltcgLabel = isSingle ? "'27년(경과조치, 현행과 동일): 보유+거주 공제 합산, 한도 80%" : (adjustedArea ? "조정대상지역 다주택자는 장특공제 배제 → 0%" : "다주택자 보유공제 유지: (보유연수−3)×2%, 최대 30%(15년)");
+    } else if(year===2028){
+      ltcgRate = isSingle ? Math.min(0.80, Math.floor(resid)*0.06+Math.floor(hold)*0.02) : (adjustedArea?0:Math.max(holdRate1pct(hold), generalLtcgRate(resid)));
+      capAmt = eok(20);
+      surchargeRate = scenario==="multi3" ? 0.15 : (scenario==="multi2" ? 0.10 : 0);
+      ltcgLabel = isSingle ? "'28년(전환기): 거주연수 × 6% + 보유연수 × 2%, 한도 80%" : (adjustedArea ? "조정대상지역 다주택자는 장특공제 배제 → 0%" : "max(보유 (보유연수−3)×1%, 거주 (거주연수−3)×2%)");
+    } else {
+      ltcgRate = isSingle ? resideRateReformFinal(resid) : (adjustedArea?0:generalLtcgRate(resid));
+      capAmt = eok(10);
+      surchargeRate = finalSurcharge;
+      ltcgLabel = isSingle ? "'29년~(완전시행): 거주연수 × 8%, 최대 80%(10년)" : (adjustedArea ? "조정대상지역 다주택자는 장특공제 배제 → 0%" : "거주공제(완전시행): (거주연수−3)×2%, 최대 30%(15년)");
+    }
+    var ltcgAmtRaw = taxableGain*ltcgRate;
+    var ltcgAmt = Math.min(ltcgAmtRaw, capAmt);
+    steps.push({
+      label:"③ 장기보유특별(거주)공제", formula: ltcgLabel,
+      sub:"공제율 "+formatPct(ltcgRate)+" → 공제액 = min("+formatEok(taxableGain)+" × "+formatPct(ltcgRate)+", "+(capAmt===Infinity?"한도없음":formatEok(capAmt))+")",
+      result: formatEok(ltcgAmt)
+    });
+
+    var basic;
+    if(mode==="current"){ basic = 2500000; }
+    else { basic = (isSingle && resid>=10 && sale<=eok(30)) ? 25000000 : 2500000; }
+    steps.push({
+      label:"④ 기본공제",
+      formula: mode==="reform" ? "기본공제 = 2,500만원 (10년 이상 거주 + 양도가액 30억원 이하 1주택 특례), 그 외 250만원" : "기본공제 = 250만원 (현행, 연 1회)",
+      sub: mode==="reform" ? (basic===25000000 ? "거주 "+resid+"년 ≥ 10년, 양도가액 "+formatEok(sale)+" ≤ 30억원 → 특례 적용" : "특례 조건 미충족 → 기본 250만원") : "",
+      result: formatWon(basic)
+    });
+
+    var base2 = Math.max(0, taxableGain-ltcgAmt-basic);
+    steps.push({ label:"⑤ 과세표준", formula:"과세표준 = 과세대상 양도차익 − 장특(거주)공제액 − 기본공제", sub:"= "+formatEok(taxableGain)+" − "+formatEok(ltcgAmt)+" − "+formatWon(basic), result: formatEok(base2) });
+
+    var br = ydBracketLookup(base2, GT_TABLE);
+    var tax = Math.max(0, base2*(br.rate+surchargeRate) - br.ded);
+    steps.push({
+      label:"⑥ 산출세액",
+      formula:"산출세액 = 과세표준 × (기본세율"+(surchargeRate>0?" + 중과세율":"")+") − 누진공제",
+      sub:"= "+formatEok(base2)+" × ("+formatPct(br.rate)+(surchargeRate>0?" + "+formatPct(surchargeRate):"")+") − "+formatWon(br.ded)+"\n적용 구간: "+formatEok(br.lo)+" ~ "+(br.hi===Infinity?"∞":formatEok(br.hi))+" (세율 "+formatPct(br.rate)+", 누진공제 "+formatWon(br.ded)+")",
+      result: formatEok(tax)
+    });
+
+    var local = tax*0.10;
+    steps.push({ label:"⑦ 지방소득세", formula:"지방소득세 = 산출세액 × 10%", sub:"= "+formatEok(tax)+" × 10%", result: formatEok(local) });
+
+    var total = tax+local;
+    steps.push({ label:"⑧ 총 부담액", formula:"총 부담액 = 산출세액 + 지방소득세", sub:"= "+formatEok(tax)+" + "+formatEok(local), result: formatEok(total) });
+
+    return { steps: steps, total: total };
+  }
+
+  // ---------- UI state ----------
+  var state = {
+    tab: "jb", // jb | yd
+    scenario: "res1",
+    verifyYear: 2027,
+    jb: { totalPrice: 18, residPrice: 18, age: 65, holdYears: 8, adjustedArea: true, prevTotalPrice: 17.5, houses: [] },
+    yd: { acqPrice: 8, salePrice: 20, expense: 0.24, holdYears: 8, residYears: 8, adjustedArea: true }
+  };
+
+  var SCENARIOS = [
+    { key:"res1",    title:"1세대 1주택(거주)",     sub:"실거주 중인 고가주택" },
+    { key:"nonres1", title:"1세대 1주택(비거주)",   sub:"비거주·일시적 2주택 등" },
+    { key:"multi2",  title:"다주택자(2주택)",       sub:"조정대상지역 여부에 따라 중과" },
+    { key:"multi3",  title:"다주택자(3주택 이상)",  sub:"조정대상지역 여부에 따라 중과" }
+  ];
+
+  var scenarioGrid = document.getElementById("scenarioGrid");
+  SCENARIOS.forEach(function(s){
+    var btn = document.createElement("button");
+    btn.className = "scenario-btn";
+    btn.type = "button";
+    btn.setAttribute("aria-pressed", state.scenario===s.key ? "true":"false");
+    btn.innerHTML = "<strong>"+s.title+"</strong><span>"+s.sub+"</span>";
+    btn.addEventListener("click", function(){
+      state.scenario = s.key;
+      Array.prototype.forEach.call(scenarioGrid.children, function(c,i){ c.setAttribute("aria-pressed", SCENARIOS[i].key===s.key ? "true":"false"); });
+      // sensible defaults per scenario
+      if(s.key==="nonres1"){ state.jb.residPrice = state.jb.totalPrice; state.yd.residYears = 0; }
+      if(s.key==="res1"){ state.yd.residYears = state.yd.holdYears; }
+      render();
+      updateJbHouseUI();
+    });
+    scenarioGrid.appendChild(btn);
+  });
+
+  var YEARS = [2027, 2028, 2029, 2030];
+  var yearPills = document.getElementById("yearPills");
+  YEARS.forEach(function(y){
+    var btn = document.createElement("button");
+    btn.className = "year-pill"; btn.type = "button";
+    btn.setAttribute("aria-pressed", state.verifyYear===y ? "true":"false");
+    btn.textContent = y+"년"+(y===2027?" (경과조치)":y===2028?" (전환기)":" (완전시행)");
+    btn.addEventListener("click", function(){
+      state.verifyYear = y;
+      Array.prototype.forEach.call(yearPills.children, function(c,i){ c.setAttribute("aria-pressed", YEARS[i]===y ? "true":"false"); });
+      renderVerify();
+    });
+    yearPills.appendChild(btn);
+  });
+
+  document.getElementById("toggleAllBtn").addEventListener("click", function(){
+    var btn = this;
+    var willOpen = btn.getAttribute("data-open") !== "true";
+    document.querySelectorAll("#compareGrid details.step").forEach(function(d){ d.open = willOpen; });
+    btn.setAttribute("data-open", willOpen ? "true" : "false");
+    btn.textContent = willOpen ? "모두 접기" : "모두 펼치기";
+  });
+
+  var tabBtnJb = document.getElementById("tabBtnJb");
+  var tabBtnYd = document.getElementById("tabBtnYd");
+  tabBtnJb.addEventListener("click", function(){ state.tab="jb"; tabBtnJb.setAttribute("aria-selected","true"); tabBtnYd.setAttribute("aria-selected","false"); render(); updateAddrCardForTab(); });
+  tabBtnYd.addEventListener("click", function(){ state.tab="yd"; tabBtnYd.setAttribute("aria-selected","true"); tabBtnJb.setAttribute("aria-selected","false"); render(); updateAddrCardForTab(); });
+
+  // ---------- 주소 -> 공시가격/실거래가 자동조회 (로컬 백엔드 연동) ----------
+  var BACKEND_URL = "http://localhost:8000";
+  var addrBtn = document.getElementById("addrLookupBtn");
+  var addrStatus = document.getElementById("addrStatus");
+  var jbAddrActions = document.getElementById("jbAddrActions");
+  var ydAddrSection = document.getElementById("ydAddrSection");
+  var addrCardTitle = document.getElementById("addrCardTitle");
+  var addrCardSub = document.getElementById("addrCardSub");
+  var tradeResultBoxEl = document.getElementById("tradeResultBox");
+  var acqTradeResultBoxEl = document.getElementById("acqTradeResultBox");
+
+  function setAddrStatus(text, kind){
+    addrStatus.textContent = text;
+    addrStatus.className = "addr-status" + (kind ? (" " + kind) : "");
+  }
+
+  // 탭에 따라 "공시가격 자동조회"(종부세) / "실거래가 참고"(양도세) 중 맞는 쪽만 보여준다.
+  function updateAddrCardForTab(){
+    var isJb = state.tab === "jb";
+    jbAddrActions.hidden = !isJb;
+    ydAddrSection.hidden = isJb;
+    tradeResultBoxEl.hidden = true;
+    acqTradeResultBoxEl.hidden = true;
+    setAddrStatus("");
+    if(isJb){
+      addrCardTitle.textContent = "주소로 공시가격 자동 조회 (베타)";
+      var isSingleNow = (state.scenario==="res1"||state.scenario==="nonres1");
+      addrCardSub.innerHTML = isSingleNow
+        ? '아파트·연립주택만 지원됩니다. 조회하면 올해·작년 공시가격을 한 번에 가져와서 "공시가격"과 "작년 공시가격" 칸에 자동으로 채워집니다(작년 데이터가 없으면 그 칸만 직접 입력). 이 기능을 쓰려면 로컬에서 백엔드 서버(<code>uvicorn main:app --port 8000</code>)가 켜져 있어야 합니다.'
+        : '아파트·연립주택만 지원됩니다. 다주택자는 주소를 조회할 때마다 아래 "목록에 추가"로 보유주택을 하나씩 등록하면 합계가 자동 계산됩니다. 이 기능을 쓰려면 로컬에서 백엔드 서버(<code>uvicorn main:app --port 8000</code>)가 켜져 있어야 합니다.';
+    } else {
+      addrCardTitle.textContent = "주소로 실거래가 참고 조회 (베타)";
+      addrCardSub.innerHTML = '취득가액·양도가액은 본인이 실제 계약한 금액을 직접 입력해야 하지만, 참고할 시세가 필요하면 아래에서 조회해보세요. 입력칸에 자동으로 채워지지는 않습니다.';
+    }
+    updateJbHouseUI();
+  }
+
+  // 다음(카카오) 우편번호 서비스 - 주소 검색 팝업
+  var addrSearchBtn = document.getElementById("addrSearchBtn");
+  addrSearchBtn.addEventListener("click", function(){
+    if(typeof daum === "undefined" || !daum.Postcode){
+      setAddrStatus("주소 검색 팝업을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.", "err");
+      return;
+    }
+    new daum.Postcode({
+      oncomplete: function(data){
+        // 도로명주소가 있으면 그걸 우선 쓰고, 없으면 지번주소 사용
+        var chosen = data.roadAddress || data.jibunAddress || data.address;
+        document.getElementById("addrInput").value = chosen;
+        setAddrStatus("주소가 입력되었습니다. 아파트라면 동/호수도 입력 후 '공시가격 불러오기'를 눌러주세요.");
+      }
+    }).open();
+  });
+
+  addrBtn.addEventListener("click", function(){
+    var address = document.getElementById("addrInput").value.trim();
+    var dong = document.getElementById("addrDong").value.trim();
+    var ho = document.getElementById("addrHo").value.trim();
+    if(!address){ setAddrStatus("주소를 입력해주세요.", "err"); return; }
+
+    addrBtn.disabled = true;
+    setAddrStatus("조회 중...");
+
+    var url = BACKEND_URL + "/lookup?address=" + encodeURIComponent(address)
+      + (dong ? "&dong=" + encodeURIComponent(dong) : "")
+      + (ho ? "&ho=" + encodeURIComponent(ho) : "");
+
+    var isSingleScenario = (state.scenario==="res1"||state.scenario==="nonres1");
+
+    fetch(url).then(function(res){
+      return res.json().then(function(body){ return { ok: res.ok, status: res.status, body: body }; });
+    }).then(function(result){
+      addrBtn.disabled = false;
+      if(!result.ok){
+        setAddrStatus("조회 실패: " + (result.body && result.body.detail ? result.body.detail : ("HTTP " + result.status)), "err");
+        return;
+      }
+      var data = result.body;
+      if(!data.price || data.price.price_won==null){
+        setAddrStatus((data.message || "공시가격을 찾을 수 없습니다. 단독주택이면 직접 입력으로 추가해주세요."), "warn");
+        return;
+      }
+
+      var unitLabel = (data.price.apt_name||"") + " " + (data.price.dong||"") + "동 " + (data.price.ho||"") + "호";
+      var yearNote = (data.price_year ? data.price_year+"년" : "올해") + " " + formatWon(data.price.price_won)
+        + ((data.prev_price && data.prev_price.price_won!=null) ? " · " + (data.prev_price_year ? data.prev_price_year+"년" : "작년") + " " + formatWon(data.prev_price.price_won) : "");
+
+      if(isSingleScenario){
+        // ---- 1세대1주택: 공시가격/작년 공시가격 칸에 바로 채운다 (주택이 1채뿐이라 목록이 필요 없음) ----
+        var eokValue = Math.round((data.price.price_won / 1e8) * 100) / 100;
+        state.jb.totalPrice = eokValue;
+        var prevFilled = false;
+        if(data.prev_price && data.prev_price.price_won!=null){
+          state.jb.prevTotalPrice = Math.round((data.prev_price.price_won / 1e8) * 100) / 100;
+          prevFilled = true;
+        }
+        if(data.needs_unit_disambiguation){
+          setAddrStatus("이 단지에는 여러 세대가 있습니다. 동/호수를 입력하면 더 정확해집니다. (일단 첫 번째 세대 값으로 채웠습니다) · " + yearNote, "warn");
+        } else if(!prevFilled){
+          setAddrStatus("조회 완료: " + unitLabel + " · " + yearNote
+            + " · " + (data.prev_price_message || "작년 공시가격은 찾지 못해 직접 입력이 필요합니다."), "warn");
+        } else {
+          setAddrStatus("조회 완료(올해·작년 공시가격 모두 자동 반영): " + unitLabel + " · " + yearNote, "ok");
+        }
+      } else {
+        // ---- 다주택자: 보유주택 목록에 추가. 합계·작년 합계는 목록에서 자동 계산돼 입력 칸에 반영된다 ----
+        addJbHouse({
+          label: unitLabel.trim() || address,
+          priceWon: data.price.price_won,
+          prevPriceWon: (data.prev_price && data.prev_price.price_won!=null) ? data.prev_price.price_won : null
+        });
+        setAddrStatus("목록에 추가됨: " + unitLabel + " · " + yearNote
+          + (data.needs_unit_disambiguation ? " (여러 세대 중 첫 번째 값 — 동/호수를 입력하면 더 정확해집니다)" : ""), "ok");
+      }
+
+      if(state.tab!=="jb"){
+        state.tab = "jb";
+        tabBtnJb.setAttribute("aria-selected","true");
+        tabBtnYd.setAttribute("aria-selected","false");
+        updateAddrCardForTab();
+      }
+      render(true);
+    }).catch(function(err){
+      addrBtn.disabled = false;
+      setAddrStatus("백엔드 서버에 연결할 수 없습니다. 로컬에서 서버가 켜져 있는지 확인하세요 (http://localhost:8000). " + err, "err");
+    });
+  });
+
+  // ---------- 다주택자: 보유주택 목록 관리 (합계·작년 합계를 목록에서 자동 계산) ----------
+  var jbHouseSection = document.getElementById("jbHouseSection");
+  var jbHouseListEl = document.getElementById("jbHouseList");
+  var jbHouseSumEl = document.getElementById("jbHouseSum");
+  var jbManualLabelInput = document.getElementById("jbManualLabel");
+  var jbManualPriceInput = document.getElementById("jbManualPrice");
+  var jbManualAddBtn = document.getElementById("jbManualAddBtn");
+  var jbHouseIdSeq = 1;
+
+  // 탭·시나리오에 맞춰 목록 UI를 보여줄지, 조회 버튼 라벨을 뭐로 할지 결정한다.
+  function updateJbHouseUI(){
+    var isSingleNow = (state.scenario==="res1"||state.scenario==="nonres1");
+    var isJbTab = state.tab==="jb";
+    jbHouseSection.hidden = !(isJbTab && !isSingleNow);
+    addrBtn.textContent = (isJbTab && !isSingleNow) ? "목록에 추가" : "공시가격 불러오기";
+    renderJbHouseList();
+  }
+
+  function addJbHouse(house){
+    house.id = "h" + (jbHouseIdSeq++);
+    house.isResidence = state.jb.houses.length===0; // 첫 주택은 기본으로 실거주로 체크(나중에 바꿀 수 있음)
+    state.jb.houses.push(house);
+    recomputeJbFromHouses();
+    renderJbHouseList();
+  }
+
+  // 목록의 합계·실거주 주택 가격·작년 합계를 계산해서 state.jb의 기존 입력 필드에 그대로 반영한다.
+  // (jbTotal/jbResid/jbPrevTotal 필드는 그대로 두고, 이 함수가 그 값을 채워넣는 방식 — 목록 없이
+  //  직접 타이핑하던 기존 사용법과 100% 호환된다.)
+  function recomputeJbFromHouses(){
+    var houses = state.jb.houses;
+    if(houses.length===0) return;
+    var totalWon = houses.reduce(function(s,h){ return s + (h.priceWon||0); }, 0);
+    var resident = houses.filter(function(h){ return h.isResidence; })[0];
+    var residWon = resident ? (resident.priceWon||0) : 0;
+    var prevWon = houses.reduce(function(s,h){ return s + (h.prevPriceWon||0); }, 0);
+    state.jb.totalPrice = Math.round((totalWon/1e8)*100)/100;
+    state.jb.residPrice = Math.round((residWon/1e8)*100)/100;
+    state.jb.prevTotalPrice = Math.round((prevWon/1e8)*100)/100;
+  }
+
+  function jbHouseSumHtml(){
+    var houses = state.jb.houses;
+    var sumWon = houses.reduce(function(s,h){ return s + (h.priceWon||0); }, 0);
+    var prevSumWon = houses.reduce(function(s,h){ return s + (h.prevPriceWon||0); }, 0);
+    var missingPrev = houses.some(function(h){ return h.prevPriceWon==null; });
+    return "등록된 주택 " + houses.length + "채 · 합계 " + formatWon(sumWon) + " · 작년 합계 " + formatWon(prevSumWon)
+      + (missingPrev ? ' <span style="color:var(--reform-color); font-weight:700;">(작년 공시가격이 없는 주택은 아래 표에서 직접 입력해주세요 — 비워두면 그 주택은 0원으로 계산됩니다)</span>' : "");
+  }
+
+  function renderJbHouseList(){
+    var houses = state.jb.houses;
+    if(houses.length===0){
+      jbHouseListEl.innerHTML = "<div class='sub'>아직 등록된 주택이 없습니다. 위에서 주소를 조회하거나 직접 입력으로 추가해보세요.</div>";
+      jbHouseSumEl.innerHTML = "";
+      return;
+    }
+    jbHouseListEl.innerHTML = houses.map(function(h){
+      var prevCell = h.prevPriceWon!=null
+        ? formatWon(h.prevPriceWon)
+        : '<input type="number" step="0.1" min="0" placeholder="작년(억원)" data-house-prev="'+h.id+'" style="width:92px; font:inherit; padding:4px 6px; border-radius:6px; border:1.5px solid var(--border); background:var(--surface); color:var(--text-primary);">';
+      return '<div class="house-row" style="display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--gridline); flex-wrap:wrap;">'
+        + '<label style="display:flex; align-items:center; gap:5px; flex:0 0 auto; font-size:12px; color:var(--text-secondary); cursor:pointer;">'
+        +   '<input type="radio" name="jbResidenceHouse" data-house-resident="'+h.id+'" '+(h.isResidence?"checked":"")+'> 실거주'
+        + '</label>'
+        + '<span style="flex:1 1 130px; min-width:0; font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="'+esc(h.label||"주택")+'">'+esc(h.label||"주택")+'</span>'
+        + '<span style="font-size:12px; color:var(--text-secondary); white-space:nowrap;">올해 '+formatWon(h.priceWon)+'</span>'
+        + '<span style="font-size:12px; color:var(--text-muted); white-space:nowrap; display:flex; align-items:center; gap:4px;">작년 '+prevCell+'</span>'
+        + '<button type="button" data-house-remove="'+h.id+'" title="삭제" style="border:none; background:none; color:var(--critical); font-size:16px; cursor:pointer; padding:2px 6px; line-height:1;">×</button>'
+        + '</div>';
+    }).join("");
+    jbHouseSumEl.innerHTML = jbHouseSumHtml();
+  }
+
+  jbHouseListEl.addEventListener("click", function(e){
+    var removeId = e.target.getAttribute("data-house-remove");
+    if(removeId){
+      state.jb.houses = state.jb.houses.filter(function(h){ return h.id!==removeId; });
+      if(state.jb.houses.length>0 && !state.jb.houses.some(function(h){ return h.isResidence; })){
+        state.jb.houses[0].isResidence = true;
+      }
+      recomputeJbFromHouses();
+      renderJbHouseList();
+      render(true);
+      return;
+    }
+    var residentId = e.target.getAttribute("data-house-resident");
+    if(residentId){
+      state.jb.houses.forEach(function(h){ h.isResidence = (h.id===residentId); });
+      recomputeJbFromHouses();
+      renderJbHouseList();
+      render(true);
+    }
+  });
+
+  // 목록 안 "작년(억원)" 직접입력 칸은 타이핑 중 목록 전체를 다시 그리면 포커스를 잃으므로,
+  // 합계 줄만 갱신하고 결과(render)는 갱신하되 목록 자체는 다시 그리지 않는다.
+  jbHouseListEl.addEventListener("input", function(e){
+    var prevId = e.target.getAttribute("data-house-prev");
+    if(!prevId) return;
+    var h = state.jb.houses.filter(function(x){ return x.id===prevId; })[0];
+    if(!h) return;
+    var v = parseFloat(e.target.value);
+    h.prevPriceWon = (isFinite(v) && v>0) ? v*1e8 : null;
+    recomputeJbFromHouses();
+    jbHouseSumEl.innerHTML = jbHouseSumHtml();
+    render(false);
+  });
+
+  jbManualAddBtn.addEventListener("click", function(){
+    var label = jbManualLabelInput.value.trim();
+    var priceEok = parseFloat(jbManualPriceInput.value);
+    if(!priceEok || priceEok<=0){ setAddrStatus("직접 입력할 공시가격(억원)을 입력해주세요.", "err"); return; }
+    addJbHouse({ label: label || "직접 입력 주택", priceWon: priceEok*1e8, prevPriceWon: null });
+    jbManualLabelInput.value = "";
+    jbManualPriceInput.value = "";
+    setAddrStatus("목록에 추가됨: " + (label||"직접 입력 주택") + " · " + formatWon(priceEok*1e8), "ok");
+    render(true);
+  });
+
+  // ---------- 최근 실거래가 참고 조회 ----------
+  var tradeBtn = document.getElementById("tradeLookupBtn");
+  var tradeResultBox = document.getElementById("tradeResultBox");
+  var tradeTable = document.getElementById("tradeTable");
+
+  tradeBtn.addEventListener("click", function(){
+    var address = document.getElementById("addrInput").value.trim();
+    if(!address){ setAddrStatus("먼저 주소를 검색해주세요.", "err"); return; }
+
+    tradeBtn.disabled = true;
+    setAddrStatus("최근 실거래가 조회 중...");
+
+    var url = BACKEND_URL + "/trade-price?address=" + encodeURIComponent(address) + "&months=6";
+    fetch(url).then(function(res){
+      return res.json().then(function(body){ return { ok: res.ok, status: res.status, body: body }; });
+    }).then(function(result){
+      tradeBtn.disabled = false;
+      if(!result.ok){
+        setAddrStatus("실거래가 조회 실패: " + (result.body && result.body.detail ? result.body.detail : ("HTTP " + result.status)), "err");
+        tradeResultBox.hidden = true;
+        return;
+      }
+      var data = result.body;
+      if(!data.trades || data.trades.length===0){
+        setAddrStatus(data.message || "최근 6개월 내 이 지번의 실거래 내역이 없습니다.", "warn");
+        tradeResultBox.hidden = true;
+        return;
+      }
+      setAddrStatus("최근 실거래 " + data.trades.length + "건 조회됨 (표에서 금액을 클릭하면 양도가액에 바로 입력됩니다)", "ok");
+      var thead = "<thead><tr><th>거래일</th><th>단지명</th><th>동</th><th>층</th><th>전용면적</th><th>거래금액</th><th>거래유형</th><th></th></tr></thead>";
+      var tbody = "<tbody>" + data.trades.map(function(t){
+        var hasPrice = t.price_won!=null;
+        var priceAttr = hasPrice ? ' data-price-won="'+t.price_won+'"' : "";
+        var rowClass = hasPrice ? ' class="trade-row-clickable"' : "";
+        return "<tr"+rowClass+priceAttr+"><td>"+(t.deal_date||"")+"</td><td>"+(t.apt_name||"")+"</td><td>"+(t.dong||"-")+"</td><td>"+(t.floor||"")+"층</td><td>"+(t.area_m2||"")+"m²</td><td>"+(hasPrice?formatWon(t.price_won):"-")+"</td><td>"+(t.dealing_type||"")+"</td><td>"+(hasPrice?'<button type="button" class="trade-apply-btn" data-price-won="'+t.price_won+'">양도가액 적용</button>':"")+"</td></tr>";
+      }).join("") + "</tbody>";
+      tradeTable.innerHTML = thead + tbody;
+      tradeResultBox.hidden = false;
+    }).catch(function(err){
+      tradeBtn.disabled = false;
+      setAddrStatus("백엔드 서버에 연결할 수 없습니다. (http://localhost:8000) " + err, "err");
+      tradeResultBox.hidden = true;
+    });
+  });
+
+  // 실거래가 표에서 금액(행) 또는 "양도가액 적용" 버튼 클릭 시 양도가액에 자동 입력
+  tradeTable.addEventListener("click", function(e){
+    var target = e.target.closest("[data-price-won]");
+    if(!target) return;
+    var priceWon = parseFloat(target.getAttribute("data-price-won"));
+    if(!priceWon) return;
+    var eokValue = Math.round((priceWon / 1e8) * 100) / 100;
+    state.yd.salePrice = eokValue;
+    if(state.tab!=="yd"){
+      state.tab = "yd";
+      tabBtnJb.setAttribute("aria-selected","false");
+      tabBtnYd.setAttribute("aria-selected","true");
+      updateAddrCardForTab();
+    }
+    setAddrStatus("양도가액에 " + formatWon(priceWon) + " 적용됨", "ok");
+    render(true);
+  });
+
+  // ---------- 취득 당시(특정 연월) 실거래가 조회 ----------
+  var acqTradeBtn = document.getElementById("acqTradeLookupBtn");
+  var acqTradeTable = document.getElementById("acqTradeTable");
+  var acqTradeResultBox = document.getElementById("acqTradeResultBox");
+
+  acqTradeBtn.addEventListener("click", function(){
+    var address = document.getElementById("addrInput").value.trim();
+    var yearMonth = document.getElementById("acqYearMonth").value.trim();
+    if(!address){ setAddrStatus("먼저 주소를 검색해주세요.", "err"); return; }
+    if(!/^[0-9]{6}$/.test(yearMonth)){ setAddrStatus("취득시기는 YYYYMM 6자리로 입력해주세요 (예: 202103).", "err"); return; }
+
+    acqTradeBtn.disabled = true;
+    setAddrStatus("취득 당시 실거래가 조회 중...");
+
+    var url = BACKEND_URL + "/trade-price-at?address=" + encodeURIComponent(address) + "&year_month=" + encodeURIComponent(yearMonth) + "&window_months=1";
+    fetch(url).then(function(res){
+      return res.json().then(function(body){ return { ok: res.ok, status: res.status, body: body }; });
+    }).then(function(result){
+      acqTradeBtn.disabled = false;
+      if(!result.ok){
+        setAddrStatus("조회 실패: " + (result.body && result.body.detail ? result.body.detail : ("HTTP " + result.status)), "err");
+        acqTradeResultBox.hidden = true;
+        return;
+      }
+      var data = result.body;
+      if(!data.trades || data.trades.length===0){
+        setAddrStatus(data.message || (yearMonth + " 전후로 이 지번의 실거래 내역이 없습니다."), "warn");
+        acqTradeResultBox.hidden = true;
+        return;
+      }
+      setAddrStatus(yearMonth + " 전후 실거래 " + data.trades.length + "건 조회됨 (표에서 금액을 클릭하면 취득가액에 바로 입력됩니다)", "ok");
+      var thead = "<thead><tr><th>거래일</th><th>단지명</th><th>동</th><th>층</th><th>전용면적</th><th>거래금액</th><th>거래유형</th><th></th></tr></thead>";
+      var tbody = "<tbody>" + data.trades.map(function(t){
+        var hasPrice = t.price_won!=null;
+        var priceAttr = hasPrice ? ' data-price-won="'+t.price_won+'"' : "";
+        var rowClass = hasPrice ? ' class="trade-row-clickable"' : "";
+        return "<tr"+rowClass+priceAttr+"><td>"+(t.deal_date||"")+"</td><td>"+(t.apt_name||"")+"</td><td>"+(t.dong||"-")+"</td><td>"+(t.floor||"")+"층</td><td>"+(t.area_m2||"")+"m²</td><td>"+(hasPrice?formatWon(t.price_won):"-")+"</td><td>"+(t.dealing_type||"")+"</td><td>"+(hasPrice?'<button type="button" class="trade-apply-btn" data-price-won="'+t.price_won+'">취득가액 적용</button>':"")+"</td></tr>";
+      }).join("") + "</tbody>";
+      acqTradeTable.innerHTML = thead + tbody;
+      acqTradeResultBox.hidden = false;
+    }).catch(function(err){
+      acqTradeBtn.disabled = false;
+      setAddrStatus("백엔드 서버에 연결할 수 없습니다. (http://localhost:8000) " + err, "err");
+      acqTradeResultBox.hidden = true;
+    });
+  });
+
+  // 취득 당시 실거래가 표에서 금액(행) 또는 "취득가액 적용" 버튼 클릭 시 취득가액에 자동 입력
+  acqTradeTable.addEventListener("click", function(e){
+    var target = e.target.closest("[data-price-won]");
+    if(!target) return;
+    var priceWon = parseFloat(target.getAttribute("data-price-won"));
+    if(!priceWon) return;
+    var eokValue = Math.round((priceWon / 1e8) * 100) / 100;
+    state.yd.acqPrice = eokValue;
+    if(state.tab!=="yd"){
+      state.tab = "yd";
+      tabBtnJb.setAttribute("aria-selected","false");
+      tabBtnYd.setAttribute("aria-selected","true");
+      updateAddrCardForTab();
+    }
+    setAddrStatus("취득가액에 " + formatWon(priceWon) + " 적용됨", "ok");
+    render(true);
+  });
+
+  updateAddrCardForTab();
+
+  function numField(id,label,unit,value,step,hint,minVal){
+    var minAttr = (minVal===undefined) ? 0 : minVal;
+    return '<div class="field"><label for="'+id+'">'+label+'</label>'+
+      '<div class="input-row"><input type="number" id="'+id+'" value="'+value+'" step="'+(step||0.1)+'" min="'+minAttr+'">'+
+      '<span class="unit">'+unit+'</span></div>'+
+      (hint?'<span class="hint">'+hint+'</span>':'')+'</div>';
+  }
+
+  function renderInputs(){
+    var card = document.getElementById("inputCard");
+    var isSingle = (state.scenario==="res1"||state.scenario==="nonres1");
+    var html = "";
+    if(state.tab==="jb"){
+      html += "<h2>종합부동산세 입력</h2><div class='sub'>공시가격 기준(억원)으로 입력하세요</div>";
+      html += "<div class='field-grid'>";
+      html += numField("jbTotal", isSingle?"공시가격":"보유주택 공시가격 합계", "억원", state.jb.totalPrice, 0.5);
+      if(!isSingle){
+        html += numField("jbResid", "그 중 실거주 주택 공시가격", "억원", state.jb.residPrice, 0.5, "실거주 중인 주택이 없으면 0");
+      }
+      html += numField("jbPrevTotal", "작년(2025년) 공시가격", "억원", state.jb.prevTotalPrice, 0.5, "부동산공시가격알리미 등에서 확인한 작년 공시가격을 입력하면, 올해와 비교한 상승률을 그대로 앞으로도 적용해 계산합니다.");
+      html += "<div class='field' style='grid-column:1/-1;'><span class='hint' id='jbGrowthDisplay'></span></div>";
+      if(isSingle){
+        html += numField("jbAge", "만 나이(2026년 기준)", "세", state.jb.age, 1);
+        html += numField("jbHold", "보유·거주기간(2026년 기준)", "년", state.jb.holdYears, 1, "연도가 지날수록 자동으로 1년씩 늘려 계산합니다");
+      }
+      if(!isSingle && state.scenario==="multi2"){
+        html += "<div class='checkbox-field'><input type='checkbox' id='jbAdjusted' "+(state.jb.adjustedArea?"checked":"")+"><label for='jbAdjusted' style='font:inherit'>보유주택 중 조정대상지역 소재 주택 포함 (개편 후 공정시장가액비율 80% 적용)</label></div>";
+      }
+      html += "</div>";
+    } else {
+      html += "<h2>양도소득세 입력</h2><div class='sub'>거래금액 기준(억원)으로 입력하세요</div>";
+      html += "<div class='field-grid'>";
+      html += numField("ydAcq", "취득가액", "억원", state.yd.acqPrice, 0.5);
+      html += numField("ydSale", "양도(매도)가액", "억원", state.yd.salePrice, 0.5);
+      html += numField("ydExpense", "필요경비(취득세·중개보수 등)", "억원", state.yd.expense, 0.01, "기본값은 취득가액의 약 3%");
+      html += numField("ydHold", "보유기간(2026년 기준)", "년", state.yd.holdYears, 1, "매도 연도까지 자동으로 늘려 계산합니다");
+      if(isSingle){
+        html += numField("ydResid", "거주기간(2026년 기준)", "년", state.yd.residYears, 1, "매도 연도까지 자동으로 늘려 계산합니다");
+      }
+      if(!isSingle){
+        html += "<div class='checkbox-field'><input type='checkbox' id='ydAdjusted' "+(state.yd.adjustedArea?"checked":"")+"><label for='ydAdjusted' style='font:inherit'>조정대상지역 소재 주택 (다주택 중과 대상)</label></div>";
+      }
+      html += "</div>";
+    }
+    card.innerHTML = html;
+
+    // wire inputs
+    if(state.tab==="jb"){
+      document.getElementById("jbTotal").addEventListener("input", function(e){ state.jb.totalPrice=+e.target.value||0; render(false); });
+      if(!isSingle){ document.getElementById("jbResid").addEventListener("input", function(e){ state.jb.residPrice=+e.target.value||0; render(false); }); }
+      document.getElementById("jbPrevTotal").addEventListener("input", function(e){ state.jb.prevTotalPrice=+e.target.value||0; render(false); });
+      if(isSingle){
+        document.getElementById("jbAge").addEventListener("input", function(e){ state.jb.age=+e.target.value||0; render(false); });
+        document.getElementById("jbHold").addEventListener("input", function(e){ state.jb.holdYears=+e.target.value||0; render(false); });
+      }
+      if(!isSingle && state.scenario==="multi2"){
+        document.getElementById("jbAdjusted").addEventListener("change", function(e){ state.jb.adjustedArea=e.target.checked; render(false); });
+      }
+    } else {
+      document.getElementById("ydAcq").addEventListener("input", function(e){ state.yd.acqPrice=+e.target.value||0; render(false); });
+      document.getElementById("ydSale").addEventListener("input", function(e){ state.yd.salePrice=+e.target.value||0; render(false); });
+      document.getElementById("ydExpense").addEventListener("input", function(e){ state.yd.expense=+e.target.value||0; render(false); });
+      document.getElementById("ydHold").addEventListener("input", function(e){ state.yd.holdYears=+e.target.value||0; render(false); });
+      if(isSingle){ document.getElementById("ydResid").addEventListener("input", function(e){ state.yd.residYears=+e.target.value||0; render(false); }); }
+      if(!isSingle){ document.getElementById("ydAdjusted").addEventListener("change", function(e){ state.yd.adjustedArea=e.target.checked; render(false); }); }
+    }
+  }
+
+  function renderResults(){
+    var resultTitle = document.getElementById("resultTitle");
+    var resultSub = document.getElementById("resultSub");
+    var labelCurrent = document.getElementById("labelCurrent");
+    var labelReform = document.getElementById("labelReform");
+    var valCurrent = document.getElementById("valCurrent");
+    var valReform = document.getElementById("valReform");
+    var subCurrent = document.getElementById("subCurrent");
+    var subReform = document.getElementById("subReform");
+    var deltaBanner = document.getElementById("deltaBanner");
+    var deltaText = document.getElementById("deltaText");
+    var deltaAmt = document.getElementById("deltaAmt");
+    var barChart = document.getElementById("barChart");
+    var summaryTable = document.getElementById("summaryTable");
+    var calcTable = document.getElementById("calcTable");
+    var assumpList = document.getElementById("assumpList");
+    var insightBox = document.getElementById("insightBox");
+    var insightText = document.getElementById("insightText");
+
+    var isJb = state.tab==="jb";
+    if(isJb){
+      var growthDisplay = document.getElementById("jbGrowthDisplay");
+      if(growthDisplay){
+        var prevT = state.jb.prevTotalPrice||0, curT = state.jb.totalPrice||0;
+        var rawRate = prevT>0 ? (curT-prevT)/prevT : 0;
+        var appliedRate = Math.max(0, rawRate);
+        growthDisplay.textContent = (prevT>0
+          ? (rawRate<0
+              ? "→ 작년 "+formatEok(eok(prevT))+" → 올해 "+formatEok(eok(curT))+" (하락, "+formatPct(rawRate)+"). 계속 하락한다고 가정하지 않고 0% 상승(가격 유지)으로 계산합니다."
+              : "→ 계산된 연간 상승률: "+formatPct(appliedRate)+" (작년 "+formatEok(eok(prevT))+" → 올해 "+formatEok(eok(curT))+"). 2027년부터 매년 이 비율만큼 복리로 오른다고 가정합니다.")
+          : "작년 공시가격을 입력하면 상승률이 자동으로 계산됩니다.");
+      }
+    }
+    var yearResults = YEARS.map(function(y){
+      return isJb ? calcJongbuYear(state.scenario, state.jb, y) : calcTransferYear(state.scenario, state.yd, y);
+    });
+    var curVals = yearResults.map(function(r){ return isJb ? r.current.final : r.current.total; });
+    var refVals = yearResults.map(function(r){ return isJb ? r.reform.final : r.reform.total; });
+
+    var lastIdx = YEARS.length - 1; // 2030 = 완전 시행 안정 상태(헤드라인용)
+
+    if(isJb){
+      resultTitle.textContent = "종합부동산세 계산 결과";
+      resultSub.textContent = "매도하지 않고 계속 보유할 경우, 연도별 종부세 부담";
+      subCurrent.textContent = "농특세(20%) 별도";
+      subReform.textContent = "농특세(20%) 별도";
+    } else {
+      resultTitle.textContent = "양도소득세 계산 결과";
+      resultSub.textContent = "해당 연도에 매도할 경우 부담할 양도세 (지방소득세 10% 포함)";
+      subCurrent.textContent = "지방소득세(10%) 포함";
+      subReform.textContent = "지방소득세(10%) 포함";
+    }
+
+    // ---- 헤드라인(2030년, 완전 시행 안정 상태) ----
+    labelCurrent.textContent = YEARS[lastIdx]+"년 · 현행 유지 가정";
+    labelReform.textContent = YEARS[lastIdx]+"년 · 개편안 적용";
+    valCurrent.textContent = formatEok(curVals[lastIdx]);
+    valReform.textContent = formatEok(refVals[lastIdx]);
+
+    var headDiff = refVals[lastIdx] - curVals[lastIdx];
+    var headPct = curVals[lastIdx]>0 ? headDiff/curVals[lastIdx] : (refVals[lastIdx]>0?1:0);
+    if(Math.abs(headDiff) < 1000){
+      deltaBanner.className = "delta-banner flat";
+      deltaText.textContent = YEARS[lastIdx]+"년 기준 현행과 개편 후 세액이 거의 동일합니다";
+      deltaAmt.textContent = "";
+    } else if(headDiff>0){
+      deltaBanner.className = "delta-banner up";
+      deltaText.textContent = YEARS[lastIdx]+"년 기준 개편 후 세부담 증가";
+      deltaAmt.textContent = "+"+formatEok(headDiff)+" ("+formatPct(headPct)+")";
+    } else {
+      deltaBanner.className = "delta-banner down";
+      deltaText.textContent = YEARS[lastIdx]+"년 기준 개편 후 세부담 감소";
+      deltaAmt.textContent = formatEok(headDiff)+" ("+formatPct(headPct)+")";
+    }
+
+    // ---- 연도별 막대 그래프 ----
+    var maxVal = Math.max.apply(null, curVals.concat(refVals).concat([1]));
+    var chartHtml = "";
+    YEARS.forEach(function(y, i){
+      var ch = Math.max(1, curVals[i]/maxVal*100);
+      var rh = Math.max(1, refVals[i]/maxVal*100);
+      chartHtml += "<div class='year-group'>"+
+        "<div class='year-bars'>"+
+          "<div class='ybar-wrap'><span class='ybar-val'>"+formatEok(curVals[i])+"</span><div class='ybar current' style='height:"+ch+"%'></div></div>"+
+          "<div class='ybar-wrap'><span class='ybar-val'>"+formatEok(refVals[i])+"</span><div class='ybar reform' style='height:"+rh+"%'></div></div>"+
+        "</div>"+
+        "<div class='year-label'>"+y+"</div>"+
+      "</div>";
+    });
+    barChart.innerHTML = "<div class='year-chart'>"+chartHtml+"</div>";
+
+    // ---- 연도별 요약 표 ----
+    var summaryRows = YEARS.map(function(y, i){
+      var diff = refVals[i] - curVals[i];
+      var pct = curVals[i]>0 ? diff/curVals[i] : (refVals[i]>0?1:0);
+      var cls = Math.abs(diff)<1000 ? "" : (diff>0 ? "delta-up" : "delta-down");
+      var sign = diff>0 ? "+" : "";
+      return "<tr><td>"+y+"년</td><td class='current-col'>"+formatEok(curVals[i])+"</td><td class='reform-col'>"+formatEok(refVals[i])+"</td><td class='"+cls+"'>"+sign+formatEok(diff)+" ("+sign+formatPct(pct)+")</td></tr>";
+    }).join("");
+    if(isJb){
+      var curSum = curVals.reduce(function(a,b){return a+b;},0);
+      var refSum = refVals.reduce(function(a,b){return a+b;},0);
+      var sumDiff = refSum - curSum;
+      summaryRows += "<tr class='total-row'><td>4년 누적('27~'30)</td><td class='current-col'>"+formatEok(curSum)+"</td><td class='reform-col'>"+formatEok(refSum)+"</td><td class='"+(sumDiff>0?"delta-up":sumDiff<0?"delta-down":"")+"'>"+(sumDiff>0?"+":"")+formatEok(sumDiff)+"</td></tr>";
+    }
+    summaryTable.innerHTML = "<thead><tr><th>연도</th><th>현행 유지 가정</th><th>개편안 적용</th><th>증감</th></tr></thead><tbody>"+summaryRows+"</tbody>";
+
+    // ---- 인사이트 (양도세: 가장 유리한 매도 시점) ----
+    if(!isJb){
+      var minIdx = 0;
+      for(var i=1;i<refVals.length;i++){ if(refVals[i] < refVals[minIdx]) minIdx = i; }
+      insightBox.hidden = false;
+      insightText.textContent = "현재 입력 기준으로는 "+YEARS[minIdx]+"년에 매도할 때 개편안 적용 양도세가 가장 낮게 계산됩니다 ("+formatEok(refVals[minIdx])+"). 다주택자는 중과세율이 한시 인하되는 2027~2028년이, 1주택자는 거주기간이 쌓일수록 유리해지는 경향이 있습니다.";
+    } else {
+      insightBox.hidden = true;
+    }
+
+    // ---- 연도별 상세 산출근거 (개편안 적용 기준) ----
+    var thead, tbody, assumptions;
+    if(isJb){
+      thead = "<thead><tr><th>구분</th>"+YEARS.map(function(y){return "<th>"+y+"년</th>";}).join("")+"</tr></thead>";
+      var jbRowsDef = [
+        ["공시가격 합계(그 해 기준)", function(r){ return formatEok(r.totalPrice); }],
+        ["기본공제", function(r){ return formatEok(r.reform.deduct); }],
+        ["공정시장가액비율", function(r){ return formatPct(r.reform.ratio); }],
+        ["과세표준", function(r){ return formatEok(r.reform.base); }],
+        ["산출세액", function(r){ return formatEok(r.reform.gross); }],
+        ["세액공제", function(r){ return formatEok(r.reform.credit); }],
+        ["결정세액", function(r){ return formatEok(r.reform.final); }]
+      ];
+      tbody = "<tbody>"+jbRowsDef.map(function(row){
+        return "<tr><td>"+row[0]+"</td>"+yearResults.map(function(r){ return "<td class='reform-col'>"+row[1](r)+"</td>"; }).join("")+"</tr>";
+      }).join("")+"</tbody>";
+      assumptions = [
+        "공정시장가액비율: '27년엔 모든 주택 70%, '28년~ 1세대1주택·비조정 다주택 70% / 3주택 이상·조정대상지역 보유 80%",
+        "다주택자 기본공제 = 4억원 + 5억원 × (실거주 주택 공시가격 ÷ 보유주택 공시가격 합계)",
+        "세액공제(고령자·장기보유→거주): '27년은 보유공제의 1/2과 거주공제 중 높은 값(한도 800만원), '28년~은 거주공제 기준(한도 600만원)",
+        "농어촌특별세(결정세액의 20%)는 별도이며 위 금액에는 포함되지 않음",
+        "종부세 세부담 상한(직전연도 대비 150%→200%로 완화)은 반영하지 않아, 실제 고지세액은 위 결과보다 낮을 수 있음",
+        "공시가격은 작년(2025년) 대비 올해(2026년) 상승률을 그대로 2027~2030년에도 매년 복리로 적용한다고 가정. 나이·보유기간은 연도별로 1년씩 자동 증가"
+      ];
+    } else {
+      thead = "<thead><tr><th>구분</th>"+YEARS.map(function(y){return "<th>"+y+"년</th>";}).join("")+"</tr></thead>";
+      var ydRowsDef = [
+        ["과세대상 양도차익", function(r){ return formatEok(r.taxableGain); }],
+        ["장특(거주)공제율", function(r){ return formatPct(r.reform.ltcgRate); }],
+        ["장특(거주)공제액", function(r){ return formatEok(r.reform.ltcgAmt); }],
+        ["기본공제", function(r){ return formatEok(r.reform.basic); }],
+        ["과세표준", function(r){ return formatEok(r.reform.base); }],
+        ["적용세율", function(r){ return formatPct(r.reform.rate); }],
+        ["양도소득세+지방소득세", function(r){ return formatEok(r.reform.total); }]
+      ];
+      tbody = "<tbody>"+ydRowsDef.map(function(row){
+        return "<tr><td>"+row[0]+"</td>"+yearResults.map(function(r){ return "<td class='reform-col'>"+row[1](r)+"</td>"; }).join("")+"</tr>";
+      }).join("")+"</tbody>";
+      assumptions = [
+        "1세대 1주택은 양도가액 12억원 초과분에 대해서만 과세(비과세 특례 가정)",
+        "1세대1주택 장특(거주)공제: '27년 보유+거주 각4%, '28년 거주6%+보유2%, '29~'30년 거주8%만 인정(모두 10년·최대80%)",
+        "다주택자 장특(거주)공제: '27년 보유2%(최대30%), '28년 보유1% 또는 거주2% 중 높은 값, '29~'30년 거주2%만 인정. 조정대상지역 양도 시에는 전 연도 공제 배제",
+        "공제금액 한도: '27년 없음 → '28년 20억원 → '29~'30년 10억원(1주택·다주택 공통)",
+        "다주택 중과세율(조정대상지역): '27년 +5%p/+10%p → '28년 +10%p/+15%p → '29~'30년 +20%p/+30%p(현행 수준 복귀)",
+        "10년 이상 거주 + 양도가액 30억원 이하 1주택은 기본공제 2,500만원 특례 적용",
+        "취득가액·양도가액은 매도 연도와 무관하게 동일하다고 가정(시세 변동 미반영). 65세 이상 수도권 이주 한시 감면 등 개별 특례는 미반영"
+      ];
+    }
+    calcTable.innerHTML = thead + tbody;
+    assumpList.innerHTML = assumptions.map(function(a){ return "<li>"+a+"</li>"; }).join("");
+  }
+
+  function stepHtml(step){
+    var html = "<details class='step'>";
+    html += "<summary><span class='summary-main'><span class='step-label'>"+esc(step.label)+"</span></span><span class='result'>= "+step.result+"</span></summary>";
+    html += "<div class='step-body'>";
+    html += "<div class='formula mono'>"+esc(step.formula)+"</div>";
+    if(step.bracketRows){
+      html += "<table class='bracket-table'><thead><tr><th>구간</th><th>세율</th><th>해당액</th><th>세액</th></tr></thead><tbody>";
+      if(step.bracketRows.length===0){
+        html += "<tr><td colspan='4' style='text-align:center;color:var(--text-muted);'>과세표준이 0이라 해당 구간 없음</td></tr>";
+      } else {
+        step.bracketRows.forEach(function(r){
+          html += "<tr><td>"+formatEok(r.lo)+" ~ "+(r.hi===Infinity?"∞":formatEok(r.hi))+"</td><td>"+formatPct(r.rate)+"</td><td>"+formatEok(r.amt)+"</td><td>"+formatEok(r.tax)+"</td></tr>";
+        });
+      }
+      html += "</tbody></table>";
+    } else if(step.sub){
+      html += "<div class='sub mono'>"+esc(step.sub)+"</div>";
+    }
+    html += "</div></details>";
+    return html;
+  }
+
+  function renderVerify(){
+    var isJb = state.tab==="jb";
+    var compareTitle = document.getElementById("compareTitle");
+    var compareSub = document.getElementById("compareSub");
+    var compareGrid = document.getElementById("compareGrid");
+    var finalCompare = document.getElementById("finalCompare");
+
+    compareTitle.textContent = (isJb?"종합부동산세":"양도소득세")+" 계산 과정 검증 — "+state.verifyYear+"년 기준";
+    compareSub.textContent = isJb
+      ? "위 입력값을 그대로 가져와, 왼쪽 \"현행 유지 가정\"과 오른쪽 \""+state.verifyYear+"년 개편안 적용\"이 각각 어떤 공식과 숫자로 계산됐는지 펼쳐 볼 수 있습니다."
+      : state.verifyYear+"년에 매도한다고 가정할 때, 위 입력값을 그대로 가져와 왼쪽 \"현행 유지 가정\"과 오른쪽 \""+state.verifyYear+"년 개편안 적용\"의 계산 과정을 펼쳐 볼 수 있습니다.";
+
+    var curD = isJb ? jbDerive(state.scenario, state.jb, state.verifyYear, "current") : ydDerive(state.scenario, state.yd, state.verifyYear, "current");
+    var refD = isJb ? jbDerive(state.scenario, state.jb, state.verifyYear, "reform") : ydDerive(state.scenario, state.yd, state.verifyYear, "reform");
+    var curFinal = isJb ? curD.final : curD.total;
+    var refFinal = isJb ? refD.final : refD.total;
+
+    var html = "<div class='col current'><div class='col-head'><span class='swatch current'></span><strong>현행 유지 가정</strong></div>"+
+      curD.steps.map(stepHtml).join("")+"</div>";
+    html += "<div class='col reform'><div class='col-head'><span class='swatch reform'></span><strong>개편안 적용</strong></div>"+
+      refD.steps.map(stepHtml).join("")+"</div>";
+    compareGrid.innerHTML = html;
+
+    var toggleAllBtn = document.getElementById("toggleAllBtn");
+    toggleAllBtn.textContent = "모두 펼치기";
+    toggleAllBtn.setAttribute("data-open", "false");
+
+    var diff = refFinal - curFinal;
+    var pct = curFinal>0 ? diff/curFinal : (refFinal>0?1:0);
+    var cls = Math.abs(diff)<1000 ? "flat" : (diff>0 ? "up" : "down");
+    var sign = diff>0 ? "+" : "";
+    finalCompare.innerHTML =
+      "<div class='fc-item current'><span class='fc-label'>현행 유지 가정</span><span class='fc-val'>"+formatEok(curFinal)+"</span></div>"+
+      "<div class='fc-diff "+cls+"'>"+(Math.abs(diff)<1000 ? "차이 거의 없음" : sign+formatEok(diff)+" ("+sign+formatPct(pct)+")")+"</div>"+
+      "<div class='fc-item reform'><span class='fc-label'>개편안 적용</span><span class='fc-val'>"+formatEok(refFinal)+"</span></div>";
+  }
+
+  function render(rebuildInputs){
+    if(rebuildInputs!==false){ renderInputs(); }
+    renderResults();
+    renderVerify();
+  }
+
+  render(true);
+})();
+</script>
+</body>
+</html>

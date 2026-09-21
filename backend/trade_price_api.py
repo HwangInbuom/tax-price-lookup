@@ -29,11 +29,20 @@ response/body/items/item 이 실거래 1건씩이고 주요 필드:
 """
 
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 import requests
 
 BASE_URL = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev"
+
+# 한 번에 가져올 행 수. 거래가 많은 구(송파·강남 등)는 한 달에 1000건을 넘을 수 있어서,
+# 넘치는 경우 다음 페이지를 이어서 가져온다(_fetch_month_items 참고).
+ROWS_PER_PAGE = 1000
+MAX_PAGES = 5
+# 여러 달을 동시에 조회할 최대 스레드 수. 예전에는 한 달씩 순서대로 호출해서, 거래가 많은
+# 대단지는 6개월 조회가 서버리스 함수 제한 시간을 넘겨 타임아웃이 났다(2026-09-21 확인).
+MAX_PARALLEL = 8
 
 
 class TradePriceLookupError(Exception):
@@ -54,21 +63,22 @@ def _recent_year_months(n):
     return out
 
 
-def fetch_trades_raw(lawd_cd: str, deal_ymd: str, service_key: str) -> str:
-    """특정 시군구·계약월의 실거래 전체를 XML 원문 그대로 가져온다."""
+def fetch_trades_raw(lawd_cd: str, deal_ymd: str, service_key: str, page_no: int = 1) -> str:
+    """특정 시군구·계약월의 실거래를 XML 원문 그대로 가져온다 (한 페이지)."""
     params = {
         "serviceKey": service_key,
         "LAWD_CD": lawd_cd,
         "DEAL_YMD": deal_ymd,
-        "numOfRows": 1000,
-        "pageNo": 1,
+        "numOfRows": ROWS_PER_PAGE,
+        "pageNo": page_no,
     }
     res = requests.get(BASE_URL, params=params, timeout=8)
     res.raise_for_status()
     return res.text
 
 
-def _parse_items(xml_text: str):
+def _parse_response(xml_text: str):
+    """(items, total_count)를 반환한다."""
     root = ET.fromstring(xml_text)
     result_code = root.findtext("./header/resultCode")
     if result_code not in (None, "000", "00"):
@@ -79,7 +89,44 @@ def _parse_items(xml_text: str):
     for item in root.findall("./body/items/item"):
         row = {child.tag: (child.text or "").strip() for child in item}
         items.append(row)
-    return items
+
+    total_text = root.findtext("./body/totalCount") or ""
+    total = int(total_text) if total_text.isdigit() else len(items)
+    return items, total
+
+
+def _parse_items(xml_text: str):
+    return _parse_response(xml_text)[0]
+
+
+def _fetch_month_items(lawd_cd: str, deal_ymd: str, service_key: str):
+    """한 달치 거래 전체(여러 페이지면 이어서)를 가져온다. 네트워크 실패 시 빈 리스트."""
+    try:
+        items, total = _parse_response(fetch_trades_raw(lawd_cd, deal_ymd, service_key, 1))
+        page = 2
+        while len(items) < total and page <= MAX_PAGES:
+            more, _ = _parse_response(fetch_trades_raw(lawd_cd, deal_ymd, service_key, page))
+            if not more:
+                break
+            items.extend(more)
+            page += 1
+        return items
+    except requests.RequestException:
+        return []  # 그 달 조회 실패는 건너뛰고 나머지 달은 계속 사용
+
+
+def _collect_matching(year_months, lawd_cd, service_key, target_bonbun, target_bubun):
+    """여러 달을 병렬로 조회해서, 지번(본번/부번)이 일치하는 거래만 모은다."""
+    workers = max(1, min(MAX_PARALLEL, len(year_months)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(lambda ymd: _fetch_month_items(lawd_cd, ymd, service_key), year_months))
+
+    matched = []
+    for items in results:
+        for row in items:
+            if row.get("bonbun") == target_bonbun and row.get("bubun") == target_bubun:
+                matched.append(_row_to_trade(row))
+    return matched
 
 
 def get_recent_trades(
@@ -93,16 +140,9 @@ def get_recent_trades(
     target_bonbun = str(main_address_no or "0").zfill(4)
     target_bubun = str(sub_address_no or "0").zfill(4)
 
-    matched = []
-    for ymd in _recent_year_months(months):
-        try:
-            raw = fetch_trades_raw(lawd_cd, ymd, service_key)
-        except requests.RequestException:
-            continue  # 그 달 조회 실패는 건너뛰고 나머지 달은 계속 시도
-        for row in _parse_items(raw):
-            if row.get("bonbun") == target_bonbun and row.get("bubun") == target_bubun:
-                matched.append(_row_to_trade(row))
-
+    matched = _collect_matching(
+        _recent_year_months(months), lawd_cd, service_key, target_bonbun, target_bubun
+    )
     matched.sort(key=lambda r: r["deal_date"], reverse=True)
     return matched
 
@@ -154,15 +194,8 @@ def get_trades_for_month(
     target_bonbun = str(main_address_no or "0").zfill(4)
     target_bubun = str(sub_address_no or "0").zfill(4)
 
-    matched = []
-    for ymd in _months_around(year_month, window):
-        try:
-            raw = fetch_trades_raw(lawd_cd, ymd, service_key)
-        except requests.RequestException:
-            continue
-        for row in _parse_items(raw):
-            if row.get("bonbun") == target_bonbun and row.get("bubun") == target_bubun:
-                matched.append(_row_to_trade(row))
-
+    matched = _collect_matching(
+        _months_around(year_month, window), lawd_cd, service_key, target_bonbun, target_bubun
+    )
     matched.sort(key=lambda r: r["deal_date"])  # 오래된 순 (취득시기에 가까운 순서로 보기 편하게)
     return matched

@@ -46,7 +46,17 @@ dongNm/hoNm을 지정하지 않으면 여러 세대가 섞여서 돌아오므로
 
 import requests
 
-BASE_URL = "https://api.vworld.kr/ned/data/getApartHousingPriceAttr"
+PATH = "/ned/data/getApartHousingPriceAttr"
+# 브이월드가 서버 쪽 https 호출에 응답 없이 연결을 끊는 경우가 있어서 https -> http 순으로 시도한다.
+# (브이월드 공식 예제와 문서가 http 주소를 쓴다.)
+BASE_URLS = ["https://api.vworld.kr" + PATH, "http://api.vworld.kr" + PATH]
+BASE_URL = BASE_URLS[0]  # 이전 코드 호환용
+
+# requests 기본 User-Agent(python-requests/x.y)를 막는 공공기관 서버가 많아서 브라우저 UA를 쓴다.
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+)
 
 
 class PriceLookupError(Exception):
@@ -91,19 +101,34 @@ def fetch_apartment_price_raw(
     if ho_nm:
         params["hoNm"] = ho_nm
 
-    headers = {}
+    headers = {
+        "User-Agent": BROWSER_UA,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "ko-KR,ko;q=0.9",
+        "Connection": "close",  # keep-alive 협상 단계에서 끊기는 것을 피한다
+    }
     referer = _referer_header(vworld_domain)
     if referer:
         headers["Referer"] = referer
 
-    try:
-        res = requests.get(BASE_URL, params=params, headers=headers, timeout=8)
-        res.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        # 브이월드 서버가 응답 없이 연결을 끊는 경우 등, 네트워크 단계 실패를 포함한다.
-        # (예: 해외 서버에서 호출 시 국내 공공기관 API가 접속 자체를 막는 경우가 있음)
-        raise PriceLookupError(f"브이월드 서버 연결 실패: {e}")
-    return res.json()
+    # https -> http 순으로 시도하고, 어느 주소에서 어떻게 실패했는지 전부 남긴다.
+    failures = []
+    for url in BASE_URLS:
+        try:
+            res = requests.get(url, params=params, headers=headers, timeout=8)
+            res.raise_for_status()
+            return res.json()
+        except requests.exceptions.RequestException as e:
+            scheme = url.split(":", 1)[0]
+            failures.append(f"{scheme}: {e}")
+        except ValueError as e:  # JSON 파싱 실패 (HTML 오류 페이지 등)
+            scheme = url.split(":", 1)[0]
+            body = (res.text or "")[:200].replace("\n", " ")
+            failures.append(f"{scheme}: JSON 아님({e}) 본문앞부분={body}")
+
+    # 브이월드 서버가 응답 없이 연결을 끊는 경우 등, 네트워크 단계 실패를 포함한다.
+    # (예: 클라우드 서버에서 호출 시 국내 공공기관 API가 접속 자체를 막는 경우가 있음)
+    raise PriceLookupError("브이월드 서버 연결 실패 — " + " / ".join(failures))
 
 
 def parse_price(raw: dict, dong_nm: str | None = None, ho_nm: str | None = None) -> dict:

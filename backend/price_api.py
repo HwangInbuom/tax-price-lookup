@@ -46,6 +46,13 @@ dongNm/hoNm을 지정하지 않으면 여러 세대가 섞여서 돌아오므로
 
 import requests
 
+try:
+    # 브이월드 앞단이 TLS 지문(JA3)으로 브라우저가 아닌 클라이언트를 걸러내는 것으로 보인다.
+    # curl_cffi 는 실제 크롬과 같은 TLS/HTTP2 지문으로 호출해 준다. 없으면 requests 만 쓴다.
+    from curl_cffi import requests as cffi
+except Exception:  # pragma: no cover
+    cffi = None
+
 PATH = "/ned/data/getApartHousingPriceAttr"
 # 브이월드가 서버 쪽 https 호출에 응답 없이 연결을 끊는 경우가 있어서 https -> http 순으로 시도한다.
 # (브이월드 공식 예제와 문서가 http 주소를 쓴다.)
@@ -101,33 +108,60 @@ def fetch_apartment_price_raw(
     if ho_nm:
         params["hoNm"] = ho_nm
 
-    headers = {
+    referer = _referer_header(vworld_domain)
+
+    plain_headers = {
         "User-Agent": BROWSER_UA,
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "ko-KR,ko;q=0.9",
         "Connection": "close",  # keep-alive 협상 단계에서 끊기는 것을 피한다
     }
-    referer = _referer_header(vworld_domain)
+    # impersonate 를 쓰면 curl_cffi 가 크롬의 헤더 전체를 알아서 넣으므로 Referer 만 얹는다.
+    cffi_headers = {}
     if referer:
-        headers["Referer"] = referer
+        plain_headers["Referer"] = referer
+        cffi_headers["Referer"] = referer
 
-    # https -> http 순으로 시도하고, 어느 주소에서 어떻게 실패했는지 전부 남긴다.
-    failures = []
+    attempts = []
+    if cffi is not None:
+        for url in BASE_URLS:
+            scheme = url.split(":", 1)[0]
+            attempts.append(
+                (
+                    f"chrome({scheme})",
+                    lambda u=url: cffi.get(
+                        u, params=params, headers=cffi_headers, timeout=10, impersonate="chrome"
+                    ),
+                )
+            )
+    else:
+        attempts.append(("chrome", None))  # 설치 안 됨을 실패 목록에 남기기 위한 자리
     for url in BASE_URLS:
+        scheme = url.split(":", 1)[0]
+        attempts.append((f"requests({scheme})", lambda u=url: requests.get(u, params=params, headers=plain_headers, timeout=8)))
+
+    # 어느 방식/주소에서 어떻게 실패했는지 전부 남긴다. 다음 실패를 바로 진단하기 위한 것.
+    failures = []
+    for label, call in attempts:
+        if call is None:
+            failures.append(f"{label}: curl_cffi 미설치")
+            continue
+        res = None
         try:
-            res = requests.get(url, params=params, headers=headers, timeout=8)
+            res = call()
             res.raise_for_status()
             return res.json()
-        except requests.exceptions.RequestException as e:
-            scheme = url.split(":", 1)[0]
-            failures.append(f"{scheme}: {e}")
-        except ValueError as e:  # JSON 파싱 실패 (HTML 오류 페이지 등)
-            scheme = url.split(":", 1)[0]
-            body = (res.text or "")[:200].replace("\n", " ")
-            failures.append(f"{scheme}: JSON 아님({e}) 본문앞부분={body}")
+        except Exception as e:
+            body = ""
+            try:
+                if res is not None and res.text:
+                    body = " 본문=" + res.text[:150].replace("\n", " ")
+            except Exception:
+                pass
+            failures.append(f"{label}: {type(e).__name__} {e}{body}")
 
-    # 브이월드 서버가 응답 없이 연결을 끊는 경우 등, 네트워크 단계 실패를 포함한다.
-    # (예: 클라우드 서버에서 호출 시 국내 공공기관 API가 접속 자체를 막는 경우가 있음)
+    # (브이월드는 클라우드 서버에서 오는 호출에 502 를 돌려주는 것이 2026-09-28 확인됨.
+    #  같은 키·같은 주소를 사용자 PC 브라우저에서 부르면 정상 응답한다.)
     raise PriceLookupError("브이월드 서버 연결 실패 — " + " / ".join(failures))
 
 
